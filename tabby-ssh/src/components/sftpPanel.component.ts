@@ -1,14 +1,20 @@
 import * as C from 'constants'
 import { posix as path } from 'path'
-import { Component, Input, Output, EventEmitter, Inject, Optional, HostListener, HostBinding, OnDestroy } from '@angular/core'
+import { Component, Input, Output, EventEmitter, Inject, Optional, HostListener, HostBinding, OnDestroy, ElementRef } from '@angular/core'
 import { Subscription } from 'rxjs'
-import { FileUpload, DirectoryUpload, DirectoryDownload, MenuItemOptions, NotificationsService, PlatformService, TranslateService, ConfigService } from 'tabby-core'
+import { FileUpload, DirectoryUpload, DirectoryDownload, FileTransfer, MenuItemOptions, NotificationsService, PlatformService, TranslateService, ConfigService, HostAppService, Platform } from 'tabby-core'
 import { SFTPSession, SFTPFile } from '../session/sftp'
 import { SSHSession } from '../session/ssh'
 import { SFTPContextMenuItemProvider } from '../api'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { SFTPCreateDirectoryModalComponent } from './sftpCreateDirectoryModal.component'
 import { SFTPDeleteModalComponent } from './sftpDeleteModal.component'
+import { SFTPNameModalComponent } from './sftpNameModal.component'
+import { SFTPConflictModalComponent, SFTPConflictChoice, SFTPConflictResult } from './sftpConflictModal.component'
+import { SFTPPermissionsModalComponent } from './sftpPermissionsModal.component'
+import { SFTPEditorModalComponent } from './sftpEditorModal.component'
+import { SFTPTransferLogModalComponent } from './sftpTransferLogModal.component'
+import { SFTPTransfersService } from '../services/sftpTransfers.service'
 
 interface PathSegment {
     name: string
@@ -22,6 +28,10 @@ interface SFTPUserConfig {
     multiSelect: boolean
     dragAndDrop: boolean
     showDownloadButton: boolean
+    startDirectory: string
+    editorPath: string
+    editorMaxSizeMB: number
+    transfersAutoShow: boolean
 }
 
 @Component({
@@ -46,10 +56,19 @@ export class SFTPPanelComponent implements OnDestroy {
     viewMode: 'grid' | 'list' = 'grid'
     showHidden = false
     isDragging = false
+    dropTargetPath: string | null = null
+    progressTick = 0
     private dragDepth = 0
     private selected = new Set<string>()
     private anchorPath: string | null = null
     private configSub: Subscription | null = null
+    private clipboard: { action: 'copy' | 'cut', items: SFTPFile[] } | null = null
+    private conflictApplyAll: SFTPConflictChoice | null = null
+    private dragCache = new Map<string, string>()
+    private internalDragItems: SFTPFile[] | null = null
+    private activeTransfers: FileTransfer[] = []
+    private progressTimer: ReturnType<typeof setInterval> | null = null
+    private progressHideAt = 0
 
     constructor (
         private ngbModal: NgbModal,
@@ -57,6 +76,9 @@ export class SFTPPanelComponent implements OnDestroy {
         private translate: TranslateService,
         private config: ConfigService,
         public platform: PlatformService,
+        private hostApp: HostAppService,
+        private transferLog: SFTPTransfersService,
+        private element: ElementRef<HTMLElement>,
         @Optional() @Inject(SFTPContextMenuItemProvider) protected contextMenuProviders: SFTPContextMenuItemProvider[],
     ) {
         this.contextMenuProviders = this.contextMenuProviders ?? []
@@ -75,6 +97,15 @@ export class SFTPPanelComponent implements OnDestroy {
 
     ngOnDestroy (): void {
         this.configSub?.unsubscribe()
+        this.stopProgressTimer()
+    }
+
+    private stopProgressTimer (): void {
+        this.progressHideAt = 0
+        if (this.progressTimer) {
+            clearInterval(this.progressTimer)
+            this.progressTimer = null
+        }
     }
 
     private applySftpSettings (): void {
@@ -87,10 +118,14 @@ export class SFTPPanelComponent implements OnDestroy {
     async ngOnInit (): Promise<void> {
         this.configSub = this.config.changed$.subscribe(() => this.applySftpSettings())
         this.sftp = await this.session.openSFTP()
+        let start = this.path
+        if (!start || start === '/') {
+            start = await this.resolveStartPath()
+        }
         try {
-            await this.navigate(this.path)
+            await this.navigate(start)
         } catch (error) {
-            console.warn('Could not navigate to', this.path, ':', error)
+            console.warn('Could not navigate to', start, ':', error)
             this.notifications.error(error.message)
             await this.navigate('/')
         }
@@ -269,6 +304,63 @@ export class SFTPPanelComponent implements OnDestroy {
         return this.selected.size
     }
 
+    get hasClipboard (): boolean {
+        return !!this.clipboard?.items.length
+    }
+
+    get isInternalDrag (): boolean {
+        return !!this.internalDragItems?.length
+    }
+
+    get hasActiveTransfers (): boolean {
+        void this.progressTick
+        return this.activeTransfers.some(transfer => !transfer.isCancelled())
+    }
+
+    get transferLabel (): string {
+        void this.progressTick
+        const active = this.liveTransfers.filter(transfer => !transfer.isComplete())
+        if (active.length > 1) {
+            return this.translate.instant('Downloading {count} items', { count: active.length })
+        }
+        return active[0]?.getName() ?? this.liveTransfers[0]?.getName() ?? ''
+    }
+
+    get transferStatus (): string {
+        void this.progressTick
+        return this.liveTransfers[0]?.getStatus() ?? ''
+    }
+
+    get transferCompleted (): number {
+        void this.progressTick
+        return this.liveTransfers.reduce((sum, transfer) => sum + transfer.getCompletedBytes(), 0)
+    }
+
+    get transferTotal (): number {
+        void this.progressTick
+        return this.liveTransfers.reduce((sum, transfer) => sum + (transfer.getSize() || transfer.getTotalSize()), 0)
+    }
+
+    get transferRemaining (): number {
+        return Math.max(0, this.transferTotal - this.transferCompleted)
+    }
+
+    get transferPercent (): number {
+        if (!this.transferTotal) {
+            return 0
+        }
+        return Math.min(100, Math.round(100 * this.transferCompleted / this.transferTotal))
+    }
+
+    get transferSpeed (): number {
+        void this.progressTick
+        return this.liveTransfers.reduce((sum, transfer) => sum + (transfer.isPaused() ? 0 : transfer.getSpeed()), 0)
+    }
+
+    private get liveTransfers (): FileTransfer[] {
+        return this.activeTransfers.filter(transfer => !transfer.isCancelled())
+    }
+
     get selectedItems (): SFTPFile[] {
         return this.filteredFileList.filter(item => this.selected.has(item.fullPath))
     }
@@ -354,6 +446,10 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     onDragEnter (event: DragEvent): void {
+        if (this.isInternalDrag) {
+            event.preventDefault()
+            return
+        }
         if (!this.sftpConfig.dragAndDrop || !this.hasFiles(event)) {
             return
         }
@@ -364,6 +460,13 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     onDragOver (event: DragEvent): void {
+        if (this.isInternalDrag) {
+            event.preventDefault()
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'none'
+            }
+            return
+        }
         if (!this.sftpConfig.dragAndDrop || !this.hasFiles(event)) {
             return
         }
@@ -375,6 +478,9 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     onDragLeave (event: DragEvent): void {
+        if (this.isInternalDrag) {
+            return
+        }
         if (!this.hasFiles(event) && this.dragDepth === 0) {
             return
         }
@@ -390,6 +496,10 @@ export class SFTPPanelComponent implements OnDestroy {
         event.stopPropagation()
         this.dragDepth = 0
         this.isDragging = false
+        if (this.isInternalDrag) {
+            this.clearInternalDrag()
+            return
+        }
         if (!this.sftpConfig.dragAndDrop) {
             return
         }
@@ -410,6 +520,11 @@ export class SFTPPanelComponent implements OnDestroy {
         if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) {
             return
         }
+        const root = this.element.nativeElement
+        const active = document.activeElement
+        if (!root.contains(target) && !(active instanceof Node && root.contains(active))) {
+            return
+        }
 
         if (event.key === 'Escape' && this.selected.size) {
             this.clearSelection()
@@ -421,6 +536,27 @@ export class SFTPPanelComponent implements OnDestroy {
             event.preventDefault()
             this.selected = new Set(this.filteredFileList.map(item => item.fullPath))
             this.anchorPath = this.filteredFileList[0]?.fullPath ?? null
+            return
+        }
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+            this.copySelected()
+            event.preventDefault()
+            return
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
+            this.cutSelected()
+            event.preventDefault()
+            return
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+            this.pasteClipboard()
+            event.preventDefault()
+            return
+        }
+        if (event.key === 'F2') {
+            this.renameSelected()
+            event.preventDefault()
         }
     }
 
@@ -433,10 +569,10 @@ export class SFTPPanelComponent implements OnDestroy {
             if (stat.isDirectory) {
                 await this.navigate(item.fullPath)
             } else {
-                await this.download(item.fullPath, stat.mode, stat.size)
+                await this.editOrDownload(item)
             }
         } else {
-            await this.download(item.fullPath, item.mode, item.size)
+            await this.editOrDownload(item)
         }
     }
 
@@ -474,8 +610,11 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     async upload (): Promise<void> {
+        this.conflictApplyAll = null
         const transfers = await this.platform.startUpload({ multiple: true })
-        await Promise.all(transfers.map(t => this.uploadOne(t)))
+        for (const transfer of transfers) {
+            await this.uploadOne(transfer)
+        }
     }
 
     async uploadFolder (): Promise<void> {
@@ -485,7 +624,10 @@ export class SFTPPanelComponent implements OnDestroy {
 
     async uploadOneFolder (transfer: DirectoryUpload, accumPath = ''): Promise<void> {
         const savedPath = this.path
-        for(const t of transfer.getChildrens()) {
+        if (!accumPath) {
+            this.conflictApplyAll = null
+        }
+        for (const t of transfer.getChildrens()) {
             if (t instanceof DirectoryUpload) {
                 try {
                     await this.sftp.mkdir(path.posix.join(this.path, accumPath, t.getName()))
@@ -494,7 +636,7 @@ export class SFTPPanelComponent implements OnDestroy {
                 }
                 await this.uploadOneFolder(t, path.posix.join(accumPath, t.getName()))
             } else {
-                await this.sftp.upload(path.posix.join(this.path, accumPath, t.getName()), t)
+                await this.uploadOne(t, path.posix.join(accumPath, t.getName()))
             }
         }
         if (this.path === savedPath) {
@@ -502,9 +644,21 @@ export class SFTPPanelComponent implements OnDestroy {
         }
     }
 
-    async uploadOne (transfer: FileUpload): Promise<void> {
+    async uploadOne (transfer: FileUpload, relativeName?: string): Promise<void> {
         const savedPath = this.path
-        await this.sftp.upload(path.join(this.path, transfer.getName()), transfer)
+        const dest = path.posix.join(this.path, relativeName ?? transfer.getName())
+        const resolved = await this.resolveConflict(dest, transfer.getName())
+        if (resolved === 'skip') {
+            transfer.close()
+            return
+        }
+        try {
+            await this.sftp.upload(resolved, transfer)
+            this.recordTransfer('upload', path.posix.basename(resolved), resolved, 'success', transfer.getSize())
+        } catch (e) {
+            this.recordTransfer('upload', path.posix.basename(resolved), resolved, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), e.message)
+            throw e
+        }
         if (this.path === savedPath) {
             await this.navigate(this.path)
         }
@@ -515,7 +669,12 @@ export class SFTPPanelComponent implements OnDestroy {
         if (!transfer) {
             return
         }
-        this.sftp.download(itemPath, transfer)
+        this.trackTransfer(transfer)
+        this.sftp.download(itemPath, transfer).then(() => {
+            this.recordTransfer('download', path.basename(itemPath), itemPath, 'success', size)
+        }).catch(error => {
+            this.recordTransfer('download', path.basename(itemPath), itemPath, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), error?.message)
+        })
     }
 
     async downloadFolder (folder: SFTPFile): Promise<void> {
@@ -524,17 +683,21 @@ export class SFTPPanelComponent implements OnDestroy {
             if (!transfer) {
                 return
             }
-
-            // Start background size calculation and download simultaneously
-            const sizeCalculationPromise = this.calculateFolderSizeAndUpdate(folder, transfer)
-            const downloadPromise = this.downloadFolderRecursive(folder, transfer, '')
+            transfer.pausable = true
+            this.trackTransfer(transfer)
 
             try {
-                await Promise.all([sizeCalculationPromise, downloadPromise])
+                transfer.setStatus(this.translate.instant('Calculating size...'))
+                const totalSize = await this.calculateFolderSize(folder, transfer)
+                transfer.setTotalSize(totalSize)
+                transfer.setStatus('')
+                await this.downloadFolderRecursive(folder, transfer, '')
                 transfer.setStatus('')
                 transfer.setCompleted(true)
+                this.recordTransfer('download', folder.name, folder.fullPath, 'success', totalSize)
             } catch (error) {
                 transfer.cancel()
+                this.recordTransfer('download', folder.name, folder.fullPath, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), error?.message)
                 throw error
             } finally {
                 transfer.close()
@@ -545,16 +708,18 @@ export class SFTPPanelComponent implements OnDestroy {
         }
     }
 
-    private async calculateFolderSizeAndUpdate (folder: SFTPFile, transfer: DirectoryDownload) {
+    private async calculateFolderSize (folder: SFTPFile, transfer: DirectoryDownload): Promise<number> {
+        if (transfer.isCancelled()) {
+            throw new Error('Download cancelled')
+        }
         let totalSize = 0
         const items = await this.sftp.readdir(folder.fullPath)
         for (const item of items) {
             if (item.isDirectory) {
-                totalSize += await this.calculateFolderSizeAndUpdate(item, transfer)
+                totalSize += await this.calculateFolderSize(item, transfer)
             } else {
                 totalSize += item.size
             }
-            transfer.setTotalSize(totalSize)
         }
         return totalSize
     }
@@ -563,6 +728,7 @@ export class SFTPPanelComponent implements OnDestroy {
         const items = await this.sftp.readdir(folder.fullPath)
 
         for (const item of items) {
+            await transfer.waitIfPaused()
             if (transfer.isCancelled()) {
                 throw new Error('Download cancelled')
             }
@@ -575,9 +741,36 @@ export class SFTPPanelComponent implements OnDestroy {
                 await this.downloadFolderRecursive(item, transfer, itemRelativePath)
             } else {
                 const fileDownload = await transfer.createFile(itemRelativePath, item.mode, item.size)
-                await this.sftp.download(item.fullPath, fileDownload)
+                await this.sftp.download(item.fullPath, fileDownload, bytes => transfer.reportProgress(bytes))
             }
         }
+    }
+
+    private trackTransfer (transfer: FileTransfer): void {
+        this.activeTransfers.push(transfer)
+        if (this.progressTimer) {
+            return
+        }
+        this.progressTimer = setInterval(() => {
+            this.progressTick++
+            this.activeTransfers = this.activeTransfers.filter(item => !item.isCancelled())
+            if (this.activeTransfers.some(item => !item.isComplete())) {
+                this.progressHideAt = 0
+                return
+            }
+            if (!this.activeTransfers.length) {
+                this.stopProgressTimer()
+                return
+            }
+            if (!this.progressHideAt) {
+                this.progressHideAt = Date.now() + 800
+                return
+            }
+            if (Date.now() >= this.progressHideAt) {
+                this.activeTransfers = []
+                this.stopProgressTimer()
+            }
+        }, 200)
     }
 
     getModeString (item: SFTPFile): string {
@@ -683,6 +876,416 @@ export class SFTPPanelComponent implements OnDestroy {
 
     onFilterChange (): void {
         this.updateFilteredList()
+    }
+
+    async openCreateFileModal (): Promise<void> {
+        const name = await this.promptName(
+            this.translate.instant('New file'),
+            this.translate.instant('Name for the new file'),
+            '',
+            this.translate.instant('Create'),
+        )
+        if (!name) {
+            return
+        }
+        try {
+            await this.sftp.createFile(path.join(this.path, name))
+            this.notifications.notice(this.translate.instant('The file was created successfully'))
+            await this.navigate(this.path)
+        } catch {
+            this.notifications.error(this.translate.instant('The file could not be created'))
+        }
+    }
+
+    async renameSelected (): Promise<void> {
+        const item = this.selectedItems[0]
+        if (!item) {
+            return
+        }
+        const name = await this.promptName(
+            this.translate.instant('Rename'),
+            this.translate.instant('New name'),
+            item.name,
+            this.translate.instant('Rename'),
+        )
+        if (!name || name === item.name) {
+            return
+        }
+        try {
+            await this.sftp.rename(item.fullPath, path.join(this.path, name))
+            await this.navigate(this.path)
+        } catch (e) {
+            this.notifications.error(e.message)
+        }
+    }
+
+    copySelected (): void {
+        const items = this.selectedItems
+        if (!items.length) {
+            return
+        }
+        this.clipboard = { action: 'copy', items }
+        this.notifications.notice(this.translate.instant('Copied {count} items', { count: items.length }))
+    }
+
+    cutSelected (): void {
+        const items = this.selectedItems
+        if (!items.length) {
+            return
+        }
+        this.clipboard = { action: 'cut', items }
+        this.notifications.notice(this.translate.instant('Cut {count} items', { count: items.length }))
+    }
+
+    async pasteClipboard (): Promise<void> {
+        if (!this.clipboard?.items.length) {
+            return
+        }
+        const { action, items } = this.clipboard
+        this.conflictApplyAll = null
+        for (const item of items) {
+            let dest = path.join(this.path, item.name)
+            if (item.fullPath === dest && action === 'copy') {
+                dest = path.join(this.path, this.copyName(item.name))
+            }
+            const resolved = await this.resolveConflict(dest, path.posix.basename(dest))
+            if (resolved === 'skip') {
+                continue
+            }
+            try {
+                if (action === 'cut') {
+                    await this.sftp.rename(item.fullPath, resolved)
+                } else {
+                    await this.sftp.copy(item.fullPath, resolved)
+                }
+            } catch (e) {
+                this.notifications.error(e.message)
+            }
+        }
+        if (action === 'cut') {
+            this.clipboard = null
+        }
+        await this.navigate(this.path)
+    }
+
+    async openPermissions (item?: SFTPFile): Promise<void> {
+        const target = item ?? this.selectedItems[0]
+        if (!target) {
+            return
+        }
+        const modal = this.ngbModal.open(SFTPPermissionsModalComponent)
+        modal.componentInstance.item = target
+        modal.componentInstance.sftp = this.sftp
+        modal.componentInstance.canChown = this.session.authUsername === 'root' || this.session.profile.options.user === 'root'
+        await modal.result.catch(() => null)
+        await this.navigate(this.path)
+    }
+
+    async editInTabby (item: SFTPFile): Promise<void> {
+        const maxBytes = Math.max(0, Number(this.sftpConfig.editorMaxSizeMB ?? 5)) * 1024 * 1024
+        if (maxBytes && item.size > maxBytes) {
+            const proceed = (await this.platform.showMessageBox({
+                type: 'warning',
+                message: this.translate.instant('This file is larger than {size} MB. Open it anyway?', { size: this.sftpConfig.editorMaxSizeMB }),
+                buttons: [
+                    this.translate.instant('Open'),
+                    this.translate.instant('Cancel'),
+                ],
+                defaultId: 1,
+                cancelId: 1,
+            })).response === 0
+            if (!proceed) {
+                return
+            }
+        }
+        let openedAt = item.modified.getTime()
+        let content: string
+        try {
+            content = await this.sftp.readTextFile(item.fullPath, maxBytes || item.size + 1)
+            this.recordTransfer('edit-load', item.name, item.fullPath, 'success', item.size)
+        } catch (e) {
+            this.notifications.error(e.message)
+            return
+        }
+        const modal = this.ngbModal.open(SFTPEditorModalComponent, { size: 'lg' })
+        modal.componentInstance.path = item.fullPath
+        modal.componentInstance.content = content
+        const result = await modal.result.catch(() => null)
+        if (typeof result !== 'string') {
+            return
+        }
+        if (!await this.confirmRemoteUnchanged(item, openedAt)) {
+            return
+        }
+        try {
+            await this.sftp.writeTextFile(item.fullPath, result)
+            this.recordTransfer('edit-save', item.name, item.fullPath, 'success', result.length)
+            this.notifications.notice(this.translate.instant('Saved'))
+            await this.navigate(this.path)
+        } catch (e) {
+            this.recordTransfer('edit-save', item.name, item.fullPath, 'error', result.length, e.message)
+            this.notifications.error(e.message)
+        }
+    }
+
+    async editOrDownload (item: SFTPFile): Promise<void> {
+        if (this.isTextFile(item)) {
+            await this.editInTabby(item)
+            return
+        }
+        await this.download(item.fullPath, item.mode, item.size)
+    }
+
+    openTransferLog (): void {
+        this.ngbModal.open(SFTPTransferLogModalComponent, { size: 'lg' })
+    }
+
+    onItemDragStart (item: SFTPFile, event: DragEvent): void {
+        if (!this.selected.has(item.fullPath)) {
+            this.selected = new Set([item.fullPath])
+            this.anchorPath = item.fullPath
+        }
+        this.internalDragItems = this.selectedItems
+        this.dropTargetPath = null
+        event.dataTransfer?.setData('text/plain', item.fullPath)
+        event.dataTransfer?.setData('application/x-tabby-sftp', item.fullPath)
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'copyMove'
+        }
+        const cached = this.dragCache.get(this.cacheKey(item))
+        if (cached && this.hostApp.platform !== Platform.Web) {
+            this.platform.startNativeDrag(cached)
+            return
+        }
+        void this.prefetchForDrag(item)
+    }
+
+    onItemDragEnd (): void {
+        setTimeout(() => this.clearInternalDrag(), 0)
+    }
+
+    onGoUpDragOver (event: DragEvent): void {
+        if (!this.isInternalDrag || this.path === '/') {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'move'
+        }
+        this.dropTargetPath = '..'
+    }
+
+    async onGoUpDrop (event: DragEvent): Promise<void> {
+        if (!this.isInternalDrag || this.path === '/') {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        await this.moveDraggedItems(path.dirname(this.path))
+    }
+
+    onItemDragOver (item: SFTPFile, event: DragEvent): void {
+        if (!this.isInternalDrag || !item.isDirectory || this.isDraggingItem(item)) {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'move'
+        }
+        this.dropTargetPath = item.fullPath
+    }
+
+    async onItemDrop (item: SFTPFile, event: DragEvent): Promise<void> {
+        if (!this.isInternalDrag || !item.isDirectory || this.isDraggingItem(item)) {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        await this.moveDraggedItems(item.fullPath)
+    }
+
+    onDropTargetLeave (event: DragEvent): void {
+        const current = event.currentTarget as Node | null
+        const related = event.relatedTarget as Node | null
+        if (current && related && current.contains(related)) {
+            return
+        }
+        this.dropTargetPath = null
+    }
+
+    private isDraggingItem (item: SFTPFile): boolean {
+        return !!this.internalDragItems?.some(dragged => dragged.fullPath === item.fullPath)
+    }
+
+    private clearInternalDrag (): void {
+        this.internalDragItems = null
+        this.dropTargetPath = null
+        this.isDragging = false
+        this.dragDepth = 0
+    }
+
+    private async moveDraggedItems (destDir: string): Promise<void> {
+        const items = this.internalDragItems ?? []
+        this.clearInternalDrag()
+        const destination = destDir === '/' ? '/' : destDir.replace(/\/+$/, '')
+        for (const item of items) {
+            const parent = path.dirname(item.fullPath)
+            if (parent === destination || item.fullPath === destination) {
+                continue
+            }
+            const target = path.posix.join(destination, item.name)
+            if (target === item.fullPath) {
+                continue
+            }
+            try {
+                const resolved = await this.resolveConflict(target, item.name)
+                if (resolved === 'skip') {
+                    continue
+                }
+                await this.sftp.rename(item.fullPath, resolved)
+            } catch (e) {
+                this.notifications.error(e.message)
+            }
+        }
+        await this.navigate(this.path)
+    }
+
+    private async prefetchForDrag (item: SFTPFile): Promise<void> {
+        if (item.isDirectory) {
+            this.notifications.notice(this.translate.instant('Folders cannot be dragged out. Download the folder instead.'))
+            return
+        }
+        if (this.hostApp.platform === Platform.Web) {
+            return
+        }
+        this.notifications.notice(this.translate.instant('Preparing file to drag. Drop it again in a moment.'))
+        const temp = await this.platform.getTempPath(item.name)
+        if (!temp) {
+            return
+        }
+        const transfer = await this.platform.startDownload(item.name, item.mode, item.size, temp)
+        if (!transfer) {
+            return
+        }
+        try {
+            await this.sftp.download(item.fullPath, transfer)
+            this.dragCache.set(this.cacheKey(item), temp)
+        } catch (e) {
+            this.notifications.error(e.message)
+        }
+    }
+
+    private cacheKey (item: SFTPFile): string {
+        return `${item.fullPath}:${item.size}:${item.modified.getTime()}`
+    }
+
+    private async promptName (title: string, label: string, value: string, confirmLabel: string): Promise<string> {
+        const modal = this.ngbModal.open(SFTPNameModalComponent)
+        modal.componentInstance.title = title
+        modal.componentInstance.label = label
+        modal.componentInstance.value = value
+        modal.componentInstance.confirmLabel = confirmLabel
+        return (await modal.result.catch(() => '')) || ''
+    }
+
+    private async resolveStartPath (): Promise<string> {
+        const configured = (this.sftpConfig.startDirectory || '~').trim() || '~'
+        if (configured === '~') {
+            return this.sftp.getHomePath()
+        }
+        if (configured.startsWith('~/')) {
+            return path.posix.join(await this.sftp.getHomePath(), configured.slice(2))
+        }
+        return configured
+    }
+
+    private async resolveConflict (destPath: string, name: string): Promise<string | 'skip'> {
+        if (!await this.sftp.exists(destPath)) {
+            return destPath
+        }
+        const preset = this.conflictApplyAll
+        if (preset === 'overwrite') {
+            return destPath
+        }
+        if (preset === 'skip') {
+            return 'skip'
+        }
+        const modal = this.ngbModal.open(SFTPConflictModalComponent)
+        modal.componentInstance.path = destPath
+        modal.componentInstance.name = name
+        const result: SFTPConflictResult | null = await modal.result.catch(() => null)
+        if (!result) {
+            return 'skip'
+        }
+        if (result.applyToAll) {
+            this.conflictApplyAll = result.choice
+        }
+        if (result.choice === 'skip') {
+            return 'skip'
+        }
+        if (result.choice === 'rename') {
+            return path.posix.join(path.posix.dirname(destPath), result.newName || this.copyName(name))
+        }
+        return destPath
+    }
+
+    private copyName (name: string): string {
+        const dot = name.lastIndexOf('.')
+        if (dot > 0) {
+            return `${name.slice(0, dot)} (copy)${name.slice(dot)}`
+        }
+        return `${name} (copy)`
+    }
+
+    private async confirmRemoteUnchanged (item: SFTPFile, openedAt: number): Promise<boolean> {
+        try {
+            const current = await this.sftp.stat(item.fullPath)
+            if (current.modified.getTime() <= openedAt) {
+                return true
+            }
+        } catch {
+            return true
+        }
+        return (await this.platform.showMessageBox({
+            type: 'warning',
+            message: this.translate.instant('This file changed on the server while it was open. Overwrite the remote file?'),
+            buttons: [
+                this.translate.instant('Overwrite'),
+                this.translate.instant('Cancel'),
+            ],
+            defaultId: 1,
+            cancelId: 1,
+        })).response === 0
+    }
+
+    private isTextFile (item: SFTPFile): boolean {
+        if (item.isDirectory) {
+            return false
+        }
+        const match = /\.([^.]+)$/.exec(item.name)
+        const ext = match ? match[1].toLowerCase() : ''
+        return ['txt', 'log', 'ini', 'conf', 'cfg', 'md', 'json', 'yml', 'yaml', 'xml', 'csv', 'html', 'css', 'js', 'ts', 'py', 'sh', 'rb', 'php', 'rs', 'go', 'c', 'h', 'cpp', 'java', 'sql', 'vue', 'tsx', 'jsx'].includes(ext)
+    }
+
+    private recordTransfer (
+        direction: 'upload' | 'download' | 'edit-load' | 'edit-save',
+        name: string,
+        remotePath: string,
+        status: 'success' | 'error' | 'cancelled',
+        bytes: number,
+        error?: string,
+    ): void {
+        this.transferLog.record({
+            direction,
+            name,
+            remotePath,
+            host: this.hostLabel,
+            status,
+            bytes,
+            error,
+        })
     }
 
     private updateFilteredList (): void {

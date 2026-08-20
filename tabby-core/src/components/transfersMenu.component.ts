@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, HostBinding } from '@angular/core'
+import { Component, Input, Output, EventEmitter, HostBinding, OnDestroy, OnInit } from '@angular/core'
 import { TranslateService } from '@ngx-translate/core'
 import { ConfigService } from '../services/config.service'
 import { FileDownload, FileTransfer, PlatformService } from '../api/platform'
@@ -9,12 +9,14 @@ import { FileDownload, FileTransfer, PlatformService } from '../api/platform'
     templateUrl: './transfersMenu.component.pug',
     styleUrls: ['./transfersMenu.component.scss'],
 })
-export class TransfersMenuComponent {
+export class TransfersMenuComponent implements OnInit, OnDestroy {
     @Input() transfers: FileTransfer[]
     @Output() transfersChange = new EventEmitter<FileTransfer[]>()
+    progressTick = 0
     @HostBinding('class.vibrant') get isVibrant (): boolean {
         return this.config.store.appearance.vibrancy
     }
+    private progressTimer: ReturnType<typeof setInterval> | null = null
 
     constructor (
         private config: ConfigService,
@@ -22,12 +24,51 @@ export class TransfersMenuComponent {
         private translate: TranslateService,
     ) { }
 
+    ngOnInit (): void {
+        this.progressTimer = setInterval(() => {
+            this.progressTick++
+        }, 200)
+    }
+
+    ngOnDestroy (): void {
+        if (this.progressTimer) {
+            clearInterval(this.progressTimer)
+            this.progressTimer = null
+        }
+    }
+
     isDownload (transfer: FileTransfer): boolean {
         return transfer instanceof FileDownload
     }
 
+    getTotal (transfer: FileTransfer): number {
+        void this.progressTick
+        return transfer.getSize() || transfer.getTotalSize()
+    }
+
+    getCompleted (transfer: FileTransfer): number {
+        void this.progressTick
+        return transfer.getCompletedBytes()
+    }
+
+    getRemaining (transfer: FileTransfer): number {
+        return Math.max(0, this.getTotal(transfer) - this.getCompleted(transfer))
+    }
+
     getProgress (transfer: FileTransfer): number {
-        return Math.round(100 * transfer.getCompletedBytes() / transfer.getSize())
+        const size = this.getTotal(transfer)
+        if (!size) {
+            return 0
+        }
+        return Math.min(100, Math.round(100 * this.getCompleted(transfer) / size))
+    }
+
+    pauseTransfer (transfer: FileTransfer): void {
+        transfer.pause()
+    }
+
+    resumeTransfer (transfer: FileTransfer): void {
+        transfer.resume()
     }
 
     showTransfer (transfer: FileTransfer): void {

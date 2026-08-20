@@ -8,10 +8,23 @@
         label.no-wrap([ngbTooltip]='transfer.getName()')
             | {{transfer.getName()}}
             span.ms-2.text-muted(*ngIf='transfer.getStatus()') ({{transfer.getStatus()}})
-        ngb-progressbar([type]='transfer.isComplete() ? "success" : transfer.isCancelled() ? "danger" : "info"', [value]='getProgress(transfer)')
+        ngb-progressbar([type]='transfer.isComplete() ? "success" : transfer.isCancelled() ? "danger" : transfer.isPaused() ? "warning" : "info"', [value]='getProgress(transfer)')
         .metadata
-            .size {{transfer.getSize()|filesize}}
-            .speed(*ngIf='transfer.getSpeed()') {{transfer.getSpeed()|filesize}}/s
+            .size {{getCompleted(transfer)|filesize}} / {{getTotal(transfer)|filesize}}
+            .remaining(*ngIf='!transfer.isComplete() && getTotal(transfer)') {{getRemaining(transfer)|filesize}} {{'remaining'|translate}}
+            .speed(*ngIf='transfer.getSpeed() && !transfer.isPaused()') {{transfer.getSpeed()|filesize}}/s
+            .speed(*ngIf='transfer.isPaused()', translate) Paused
+
+    button.btn.btn-link(
+        *ngIf='!transfer.isComplete() && !transfer.isCancelled() && !transfer.isPaused() && transfer.pausable',
+        [ngbTooltip]='"Pause"|translate',
+        (click)='pauseTransfer(transfer); $event.stopPropagation()'
+    ) ⏸
+    button.btn.btn-link(
+        *ngIf='transfer.isPaused()',
+        [ngbTooltip]='"Resume"|translate',
+        (click)='resumeTransfer(transfer); $event.stopPropagation()'
+    ) ▶
 
     button.btn.btn-link(
         *ngIf='!transfer.isComplete()',

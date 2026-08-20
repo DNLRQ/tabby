@@ -1,0 +1,17 @@
+.modal-header
+    h4.modal-title {{title}}
+
+.modal-body
+    label {{label}}
+    .mb-3.w-100.me-2
+        input.form-control(
+            type='text',
+            autofocus,
+            [(ngModel)]='value',
+            (keyup.enter)='confirm()',
+            (keyup.esc)='cancel()'
+        )
+
+.modal-footer
+    button.btn.btn-success((click)='confirm()') {{confirmLabel}}
+    button.btn.btn-danger((click)='cancel()', translate) Cancel

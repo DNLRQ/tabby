@@ -198,6 +198,17 @@ export class ElectronPlatformService extends PlatformService {
         this.electron.shell.openPath(p)
     }
 
+    async getTempPath (name: string): Promise<string> {
+        const dir = path.join(os.tmpdir(), 'tabby-sftp')
+        await fs.mkdir(dir, { recursive: true })
+        const safe = name.replace(/[\\/]/g, '_')
+        return path.join(dir, `${Date.now()}-${safe}`)
+    }
+
+    startNativeDrag (filePath: string): void {
+        this.electron.ipcRenderer.send('ondragstart', filePath)
+    }
+
     getOSRelease (): string {
         return os.release()
     }

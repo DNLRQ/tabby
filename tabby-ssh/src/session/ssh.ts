@@ -368,7 +368,12 @@ export class SSHSession {
         if (!this.sftp) {
             this.sftp = await this.ssh.activateSFTP(await this.ssh.openSessionChannel())
         }
-        return new SFTPSession(this.sftp, this.injector)
+        return new SFTPSession(
+            this.sftp,
+            this.injector,
+            command => this.execCommand(command),
+            this.authUsername ?? this.profile.options.user,
+        )
     }
 
     async start (): Promise<void> {
@@ -876,6 +881,46 @@ export class SSHSession {
         }
         await ch.requestShell()
         return ch
+    }
+
+    async execCommand (command: string, timeoutMs = 10000): Promise<{ stdout: string, stderr: string, exitCode: number }> {
+        if (!(this.ssh instanceof russh.AuthenticatedSSHClient)) {
+            throw new Error('Cannot exec before auth')
+        }
+        const ch = await this.ssh.activateChannel(await this.ssh.openSessionChannel())
+        const stdout: Uint8Array[] = []
+        const stderr: Uint8Array[] = []
+        ch.data$.subscribe(chunk => stdout.push(chunk))
+        ch.extendedData$.subscribe(([, chunk]) => stderr.push(chunk))
+        const closed = new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                ch.close().catch(() => null)
+                reject(new Error('Command timed out'))
+            }, timeoutMs)
+            ch.closed$.subscribe(() => {
+                clearTimeout(timer)
+                resolve()
+            })
+        })
+        await ch.requestExec(command)
+        await ch.eof().catch(() => null)
+        await closed
+        const decode = (chunks: Uint8Array[]) => {
+            const total = chunks.reduce((n, chunk) => n + chunk.length, 0)
+            const buffer = new Uint8Array(total)
+            let offset = 0
+            for (const chunk of chunks) {
+                buffer.set(chunk, offset)
+                offset += chunk.length
+            }
+            return new TextDecoder().decode(buffer)
+        }
+        const stderrText = decode(stderr)
+        return {
+            stdout: decode(stdout),
+            stderr: stderrText,
+            exitCode: stderrText.trim() ? 1 : 0,
+        }
     }
 
     private setupSocketChannelEvents (channel: russh.Channel, socket: Socket, logPrefix: string): void {

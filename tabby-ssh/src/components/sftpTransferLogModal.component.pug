@@ -1,0 +1,39 @@
+.modal-header
+    h4.modal-title(translate) Transfer history
+
+.modal-body
+    .d-flex.gap-2.mb-3
+        input.form-control(
+            type='text',
+            [placeholder]='"Filter"|translate',
+            [(ngModel)]='filter'
+        )
+        select.form-control(style='max-width: 160px', [(ngModel)]='status')
+            option(value='', translate) All
+            option(value='success', translate) Success
+            option(value='error', translate) Error
+            option(value='cancelled', translate) Cancelled
+
+    .table-responsive(style='max-height: 360px')
+        table.table.table-sm
+            thead
+                tr
+                    th(translate) Time
+                    th(translate) Name
+                    th(translate) Direction
+                    th(translate) Status
+            tbody
+                tr(*ngFor='let entry of entries')
+                    td {{entry.time | tabbyDate}}
+                    td
+                        div {{entry.name}}
+                        .text-muted {{entry.remotePath}}
+                    td {{entry.direction}}
+                    td {{entry.status}}
+                tr(*ngIf='!entries.length')
+                    td(colspan='4', translate) No transfers yet
+
+.modal-footer
+    button.btn.btn-outline-secondary((click)='export()', translate) Export JSON
+    button.btn.btn-outline-danger((click)='clear()', translate) Clear
+    button.btn.btn-secondary((click)='close()', translate) Close

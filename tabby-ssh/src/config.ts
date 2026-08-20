@@ -18,6 +18,10 @@ export class SSHConfigProvider extends ConfigProvider {
                 multiSelect: true,
                 dragAndDrop: true,
                 showDownloadButton: true,
+                startDirectory: '~',
+                editorPath: '',
+                editorMaxSizeMB: 5,
+                transfersAutoShow: true,
             },
         },
         hotkeys: {

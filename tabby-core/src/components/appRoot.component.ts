@@ -171,7 +171,9 @@ export class AppRootComponent {
 
         platform.fileTransferStarted$.subscribe(transfer => {
             this.activeTransfers.push(transfer)
-            this.activeTransfersDropdown.open()
+            if (this.config.store.ssh?.sftp?.transfersAutoShow !== false) {
+                this.activeTransfersDropdown.open()
+            }
         })
 
         config.ready$.toPromise().then(async () => {

@@ -25,7 +25,40 @@ export class CommonSFTPContextMenu extends SFTPContextMenuItemProvider {
                 },
                 label: this.translate.instant('Create directory'),
             },
+            {
+                click: async () => {
+                    await panel.openCreateFileModal()
+                },
+                label: this.translate.instant('New file'),
+            },
+            {
+                click: () => panel.renameSelected(),
+                label: this.translate.instant('Rename'),
+            },
+            {
+                click: () => panel.copySelected(),
+                label: this.translate.instant('Copy'),
+            },
+            {
+                click: () => panel.cutSelected(),
+                label: this.translate.instant('Cut'),
+            },
+            {
+                click: () => panel.pasteClipboard(),
+                label: this.translate.instant('Paste'),
+            },
+            {
+                click: () => panel.openPermissions(item),
+                label: this.translate.instant('Permissions'),
+            },
         ]
+
+        if (!item.isDirectory) {
+            items.push({
+                click: () => panel.editInTabby(item),
+                label: this.translate.instant('Edit'),
+            })
+        }
 
         if (item.isDirectory && this.hostApp.platform !== Platform.Web) {
             items.push({

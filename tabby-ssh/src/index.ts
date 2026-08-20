@@ -29,6 +29,11 @@ import { SFTPContextMenuItemProvider } from './api/contextMenu'
 import { CommonSFTPContextMenu } from './sftpContextMenu'
 import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirectoryModal.component'
 import { SFTPTabComponent } from './components/sftpTab.component'
+import { SFTPNameModalComponent } from './components/sftpNameModal.component'
+import { SFTPConflictModalComponent } from './components/sftpConflictModal.component'
+import { SFTPPermissionsModalComponent } from './components/sftpPermissionsModal.component'
+import { SFTPEditorModalComponent } from './components/sftpEditorModal.component'
+import { SFTPTransferLogModalComponent } from './components/sftpTransferLogModal.component'
 
 /** @hidden */
 @NgModule({
@@ -55,6 +60,11 @@ import { SFTPTabComponent } from './components/sftpTab.component'
         SSHProfileSettingsComponent,
         SFTPDeleteModalComponent,
         SFTPCreateDirectoryModalComponent,
+        SFTPNameModalComponent,
+        SFTPConflictModalComponent,
+        SFTPPermissionsModalComponent,
+        SFTPEditorModalComponent,
+        SFTPTransferLogModalComponent,
         SSHPortForwardingModalComponent,
         SSHPortForwardingConfigComponent,
         SSHSettingsTabComponent,

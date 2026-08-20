@@ -1,0 +1,9 @@
+.modal-header
+    h4.modal-title {{path}}
+
+.modal-body
+    textarea.form-control([(ngModel)]='content')
+
+.modal-footer
+    button.btn.btn-success((click)='save()', translate) Save
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel

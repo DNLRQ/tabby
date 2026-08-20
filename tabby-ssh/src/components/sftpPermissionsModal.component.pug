@@ -1,0 +1,31 @@
+.modal-header
+    h4.modal-title(translate) Permissions
+
+.modal-body
+    p.text-muted {{item?.fullPath}}
+
+    .sftp-perm-grid.mb-3
+        label.d-flex.align-items-center.gap-2(*ngFor='let bit of bits')
+            input(type='checkbox', [checked]='hasBit(bit.mask)', (change)='toggleBit(bit.mask)')
+            span {{bit.label|translate}}
+
+    .mb-3
+        label(translate) Octal
+        input.form-control(type='text', [(ngModel)]='octal')
+
+    .mb-3(*ngIf='canChown')
+        label(translate) Owner
+        input.form-control.mb-2(type='text', [(ngModel)]='owner')
+        label(translate) Group
+        input.form-control(type='text', [(ngModel)]='group')
+
+    label.d-flex.align-items-center.gap-2(*ngIf='item?.isDirectory')
+        input(type='checkbox', [(ngModel)]='recursive')
+        span(translate) Apply recursively
+
+    .text-muted(*ngIf='busy') {{progress}}
+    .text-danger(*ngIf='error') {{error}}
+
+.modal-footer
+    button.btn.btn-success([disabled]='busy', (click)='save()', translate) Save
+    button.btn.btn-secondary([disabled]='busy', (click)='cancel()', translate) Cancel

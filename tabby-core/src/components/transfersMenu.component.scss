@@ -42,6 +42,12 @@
         opacity: .5;
         display: flex;
         align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .remaining {
+            opacity: .85;
+        }
 
         .speed {
             margin-left: auto;

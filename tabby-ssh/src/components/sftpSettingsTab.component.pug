@@ -59,9 +59,51 @@ h3(translate) Transfers
 
 .form-line
     .header
+        .title(translate) Start directory
+        .description(translate) Folder shown when SFTP opens. Use ~ for the remote home directory
+    input.form-control(
+        type='text',
+        [(ngModel)]='config.store.ssh.sftp.startDirectory',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
         .title(translate) Drag and drop uploads
         .description(translate) Drop files from your computer into the current folder
     toggle(
         [(ngModel)]='config.store.ssh.sftp.dragAndDrop',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
+        .title(translate) Show transfer list automatically
+        .description(translate) Open the transfer list when an upload or download starts
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.transfersAutoShow',
+        (ngModelChange)='config.save()',
+    )
+
+h3(translate) Editing
+
+.form-line
+    .header
+        .title(translate) Warn before opening large files
+        .description(translate) Size in megabytes. 0 disables the warning
+    input.form-control(
+        type='number',
+        min='0',
+        [(ngModel)]='config.store.ssh.sftp.editorMaxSizeMB',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
+        .title(translate) External editor
+        .description(translate) Optional path to an editor. Leave empty to use the system default
+    input.form-control(
+        type='text',
+        [(ngModel)]='config.store.ssh.sftp.editorPath',
         (ngModelChange)='config.save()',
     )

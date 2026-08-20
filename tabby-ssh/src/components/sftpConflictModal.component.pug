@@ -1,0 +1,20 @@
+.modal-header
+    h4.modal-title(translate) File already exists
+
+.modal-body
+    p {{path}}
+    p.text-muted(translate) Choose what to do with this file.
+
+    .mb-3
+        label(translate) New name
+        input.form-control(type='text', [(ngModel)]='newName')
+
+    label.d-flex.align-items-center.gap-2
+        input(type='checkbox', [(ngModel)]='applyToAll')
+        span(translate) Apply to all remaining files
+
+.modal-footer
+    button.btn.btn-outline-secondary((click)='choose("skip")', translate) Skip
+    button.btn.btn-outline-warning((click)='choose("rename")', translate) Rename
+    button.btn.btn-danger((click)='choose("overwrite")', translate) Overwrite
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel

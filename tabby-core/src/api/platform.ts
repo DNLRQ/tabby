@@ -24,6 +24,7 @@ export abstract class FileTransfer {
     abstract getName (): string
     abstract getSize (): number
     abstract close (): void
+    pausable = false
 
     getSpeed (): number {
         return this.lastChunkSpeed
@@ -42,15 +43,46 @@ export abstract class FileTransfer {
     }
 
     isComplete (): boolean {
-        return this.completed || this.completedBytes >= this.getSize()
+        if (this.completed) {
+            return true
+        }
+        const size = this.getSize()
+        return size > 0 && this.completedBytes >= size
     }
 
     isCancelled (): boolean {
         return this.cancelled
     }
 
+    isPaused (): boolean {
+        return this.paused
+    }
+
+    pause (): void {
+        this.paused = true
+    }
+
+    resume (): void {
+        this.paused = false
+        const waiters = this.pauseWaiters.splice(0)
+        for (const waiter of waiters) {
+            waiter()
+        }
+    }
+
+    async waitIfPaused (): Promise<void> {
+        while (this.paused && !this.cancelled) {
+            await new Promise<void>(resolve => this.pauseWaiters.push(resolve))
+        }
+    }
+
     cancel (): void {
         this.cancelled = true
+        this.paused = false
+        const waiters = this.pauseWaiters.splice(0)
+        for (const waiter of waiters) {
+            waiter()
+        }
         this.close()
     }
 
@@ -64,6 +96,10 @@ export abstract class FileTransfer {
 
     setCompleted (completed: boolean): void {
         this.completed = completed
+    }
+
+    reportProgress (bytes: number): void {
+        this.increaseProgress(bytes)
     }
 
     protected increaseProgress (bytes: number): void {
@@ -81,6 +117,8 @@ export abstract class FileTransfer {
     private lastChunkSpeed = 0
     private cancelled = false
     private completed = false
+    private paused = false
+    private pauseWaiters: Array<() => void> = []
     private status = ''
 }
 
@@ -155,7 +193,7 @@ export abstract class PlatformService {
     abstract loadConfig (): Promise<string>
     abstract saveConfig (content: string): Promise<void>
 
-    abstract startDownload (name: string, mode: number, size: number): Promise<FileDownload|null>
+    abstract startDownload (name: string, mode: number, size: number, filePath?: string): Promise<FileDownload|null>
     abstract startDownloadDirectory (name: string, estimatedSize?: number): Promise<DirectoryDownload|null>
     abstract startUpload (options?: FileUploadOptions): Promise<FileUpload[]>
     abstract startUploadDirectory (paths?: string[]): Promise<DirectoryUpload>
@@ -255,6 +293,12 @@ export abstract class PlatformService {
     openPath (path: string): void {
         throw new Error('Not implemented')
     }
+
+    async getTempPath (_name: string): Promise<string|null> {
+        return null
+    }
+
+    startNativeDrag (_filePath: string): void { }
 
     getTheme (): PlatformTheme {
         return 'dark'

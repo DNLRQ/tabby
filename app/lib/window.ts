@@ -476,6 +476,16 @@ export class Window {
             this.window.setOpacity(opacity)
         })
 
+        this.on('ondragstart', (_event, filePath) => {
+            if (typeof filePath !== 'string' || !this.window) {
+                return
+            }
+            this.window.webContents.startDrag({
+                file: filePath,
+                icon: activityIcon,
+            })
+        })
+
         this.on('window-set-progress-bar', (_, value) => {
             this.window?.setProgressBar(value, { mode: value < 0 ? 'none' : 'normal' })
         })

@@ -2858,3 +2858,171 @@ msgctxt "[Dynamic] port forwarding"
 msgid "id.port-forwarding.dynamic"
 msgstr "id.port-forwarding.dynamic"
 
+msgid "Transfer history"
+msgstr "Historial de transferencias"
+
+msgid "New file"
+msgstr "Nuevo archivo"
+
+msgid "Name for the new file"
+msgstr "Nombre del archivo nuevo"
+
+msgid "The file was created successfully"
+msgstr "El archivo se creó correctamente"
+
+msgid "The file could not be created"
+msgstr "No se pudo crear el archivo"
+
+msgid "Copied {count} items"
+msgstr "Se copiaron {count} elementos"
+
+msgid "Cut {count} items"
+msgstr "Se cortaron {count} elementos"
+
+msgid "Cut"
+msgstr "Cortar"
+
+msgid "Permissions"
+msgstr "Permisos"
+
+msgid "This file is larger than {size} MB. Open it anyway?"
+msgstr "Este archivo supera los {size} MB. ¿Abrirlo de todos modos?"
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "This file changed on the server while it was open. Overwrite the remote file?"
+msgstr "Este archivo cambió en el servidor mientras estaba abierto. ¿Sobrescribir el archivo remoto?"
+
+msgid "Overwrite"
+msgstr "Sobrescribir"
+
+msgid "Folders cannot be dragged out. Download the folder instead."
+msgstr "No se pueden arrastrar carpetas. Descárgala en su lugar."
+
+msgid "Preparing file to drag. Drop it again in a moment."
+msgstr "Preparando el archivo para arrastrar. Vuelve a soltarlo en un momento."
+
+msgid "Start directory"
+msgstr "Carpeta inicial"
+
+msgid "Folder shown when SFTP opens. Use ~ for the remote home directory"
+msgstr "Carpeta que se muestra al abrir SFTP. Usa ~ para el directorio personal remoto"
+
+msgid "Skip"
+msgstr "Omitir"
+
+msgid "Show transfer list automatically"
+msgstr "Mostrar la lista de transferencias automáticamente"
+
+msgid "Open the transfer list when an upload or download starts"
+msgstr "Abrir la lista de transferencias al iniciar una subida o descarga"
+
+msgid "Editing"
+msgstr "Edición"
+
+msgid "Warn before opening large files"
+msgstr "Avisar antes de abrir archivos grandes"
+
+msgid "Size in megabytes. 0 disables the warning"
+msgstr "Tamaño en megabytes. 0 desactiva el aviso"
+
+msgid "External editor"
+msgstr "Editor externo"
+
+msgid "Optional path to an editor. Leave empty to use the system default"
+msgstr "Ruta opcional a un editor. Déjalo vacío para usar el predeterminado del sistema"
+
+msgid "File already exists"
+msgstr "El archivo ya existe"
+
+msgid "Choose what to do with this file."
+msgstr "Elige qué hacer con este archivo."
+
+msgid "New name"
+msgstr "Nuevo nombre"
+
+msgid "Apply to all remaining files"
+msgstr "Aplicar al resto de archivos"
+
+msgid "Owner"
+msgstr "Propietario"
+
+msgid "Apply recursively"
+msgstr "Aplicar de forma recursiva"
+
+msgid "Pause"
+msgstr "Pausar"
+
+msgid "Resume"
+msgstr "Reanudar"
+
+msgid "Paused"
+msgstr "En pausa"
+
+msgid "All"
+msgstr "Todos"
+
+msgid "Success"
+msgstr "Correcto"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Cancelled"
+msgstr "Cancelado"
+
+msgid "Export JSON"
+msgstr "Exportar JSON"
+
+msgid "No transfers yet"
+msgstr "Aún no hay transferencias"
+
+msgid "Time"
+msgstr "Hora"
+
+msgid "Direction"
+msgstr "Dirección"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "Owner read"
+msgstr "Lectura del propietario"
+
+msgid "Owner write"
+msgstr "Escritura del propietario"
+
+msgid "Owner execute"
+msgstr "Ejecución del propietario"
+
+msgid "Group read"
+msgstr "Lectura del grupo"
+
+msgid "Group write"
+msgstr "Escritura del grupo"
+
+msgid "Group execute"
+msgstr "Ejecución del grupo"
+
+msgid "Others read"
+msgstr "Lectura de otros"
+
+msgid "Others write"
+msgstr "Escritura de otros"
+
+msgid "Others execute"
+msgstr "Ejecución de otros"
+
+msgid "Octal"
+msgstr "Octal"
+
+msgid "Calculating size..."
+msgstr "Calculando tamaño..."
+
+msgid "Downloading {count} items"
+msgstr "Descargando {count} elementos"
+
+msgid "remaining"
+msgstr "restante"
+

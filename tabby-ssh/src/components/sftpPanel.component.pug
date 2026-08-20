@@ -49,6 +49,13 @@
 
                 button.sftp-icon-btn(
                     type='button',
+                    [ngbTooltip]='"Transfer history"|translate',
+                    (click)='openTransferLog()'
+                )
+                    i.fas.fa-history
+
+                button.sftp-icon-btn(
+                    type='button',
                     [ngbTooltip]='(standalone ? "New window" : "Open in tab")|translate',
                     (click)='openNewWindow()'
                 )
@@ -91,12 +98,32 @@
                 button.sftp-action(type='button', (click)='openCreateDirectoryModal()')
                     i.fas.fa-folder-plus
                     span(translate) Create directory
+                button.sftp-action(type='button', (click)='openCreateFileModal()')
+                    i.fas.fa-file
+                    span(translate) New file
                 button.sftp-action(type='button', (click)='upload()')
                     i.fas.fa-upload
                     span(translate) Upload files
                 button.sftp-action(type='button', (click)='uploadFolder()')
                     i.fas.fa-folder-open
                     span(translate) Upload folder
+
+    .sftp-progress(*ngIf='hasActiveTransfers')
+        .sftp-progress-top
+            .sftp-progress-name([ngbTooltip]='transferLabel') {{transferLabel}}
+            .sftp-progress-file(*ngIf='transferStatus') {{transferStatus}}
+            .sftp-progress-pct {{transferPercent}}%
+        ngb-progressbar.sftp-progress-bar(
+            [type]='transferPercent >= 100 ? "success" : "info"',
+            [value]='transferPercent',
+            [striped]='true',
+            [animated]='transferPercent < 100',
+            height='8px'
+        )
+        .sftp-progress-meta
+            span {{transferCompleted|filesize}} / {{transferTotal|filesize}}
+            span.sftp-progress-remain(*ngIf='transferRemaining') {{transferRemaining|filesize}} {{'remaining'|translate}}
+            span.sftp-progress-speed(*ngIf='transferSpeed') {{transferSpeed|filesize}}/s
 
     .sftp-body(
         (click)='onBackgroundClick($event)',
@@ -105,7 +132,7 @@
         (dragleave)='onDragLeave($event)',
         (drop)='onDrop($event)'
     )
-        .sftp-drop-overlay(*ngIf='isDragging && sftpConfig.dragAndDrop')
+        .sftp-drop-overlay(*ngIf='isDragging && sftpConfig.dragAndDrop && !isInternalDrag')
             .sftp-drop-overlay-inner
                 i.fas.fa-cloud-upload-alt
                 span(translate) Drop files to upload here
@@ -139,7 +166,11 @@
                 button.sftp-card.sftp-card-up(
                     *ngIf='path !== "/" && !filterText.trim()',
                     type='button',
-                    (click)='goUp(); $event.stopPropagation()'
+                    [class.drop-target]='dropTargetPath === ".."',
+                    (click)='goUp(); $event.stopPropagation()',
+                    (dragover)='onGoUpDragOver($event)',
+                    (dragleave)='onDropTargetLeave($event)',
+                    (drop)='onGoUpDrop($event)'
                 )
                     .sftp-card-icon.kind-up
                         i.fas.fa-level-up-alt
@@ -151,6 +182,13 @@
                     type='button',
                     [class.is-dir]='item.isDirectory',
                     [class.selected]='isSelected(item)',
+                    draggable='true',
+                    [class.drop-target]='dropTargetPath === item.fullPath',
+                    (dragstart)='onItemDragStart(item, $event)',
+                    (dragend)='onItemDragEnd()',
+                    (dragover)='onItemDragOver(item, $event)',
+                    (dragleave)='onDropTargetLeave($event)',
+                    (drop)='onItemDrop(item, $event)',
                     (contextmenu)='showContextMenu(item, $event)',
                     (click)='onItemClick(item, $event)',
                     (dblclick)='onItemDblClick(item, $event)'
@@ -179,7 +217,11 @@
                 button.sftp-row.sftp-row-up(
                     *ngIf='path !== "/" && !filterText.trim()',
                     type='button',
-                    (click)='goUp(); $event.stopPropagation()'
+                    [class.drop-target]='dropTargetPath === ".."',
+                    (click)='goUp(); $event.stopPropagation()',
+                    (dragover)='onGoUpDragOver($event)',
+                    (dragleave)='onDropTargetLeave($event)',
+                    (drop)='onGoUpDrop($event)'
                 )
                     .sftp-col-name
                         .sftp-row-icon.kind-up
@@ -195,6 +237,13 @@
                     type='button',
                     [class.is-dir]='item.isDirectory',
                     [class.selected]='isSelected(item)',
+                    draggable='true',
+                    [class.drop-target]='dropTargetPath === item.fullPath',
+                    (dragstart)='onItemDragStart(item, $event)',
+                    (dragend)='onItemDragEnd()',
+                    (dragover)='onItemDragOver(item, $event)',
+                    (dragleave)='onDropTargetLeave($event)',
+                    (drop)='onItemDrop(item, $event)',
                     (contextmenu)='showContextMenu(item, $event)',
                     (click)='onItemClick(item, $event)',
                     (dblclick)='onItemDblClick(item, $event)'
@@ -222,11 +271,26 @@
             span.sftp-footer-dot ·
             span {{fileCount}} {{'files'|translate}}
             span.sftp-footer-hint(*ngIf='sftpConfig.dragAndDrop', translate) Drop files to upload
+            button.sftp-footer-action(*ngIf='hasClipboard', type='button', (click)='pasteClipboard(); $event.stopPropagation()')
+                i.fas.fa-paste
+                span(translate) Paste
         .sftp-footer-info(*ngIf='selectedCount > 0')
             span {{selectedCount}} {{'selected'|translate}}
             button.sftp-footer-action(type='button', (click)='downloadSelected(); $event.stopPropagation()')
                 i.fas.fa-download
                 span(translate) Download
+            button.sftp-footer-action(type='button', (click)='copySelected(); $event.stopPropagation()')
+                i.fas.fa-copy
+                span(translate) Copy
+            button.sftp-footer-action(type='button', (click)='cutSelected(); $event.stopPropagation()')
+                i.fas.fa-cut
+                span(translate) Cut
+            button.sftp-footer-action(*ngIf='hasClipboard', type='button', (click)='pasteClipboard(); $event.stopPropagation()')
+                i.fas.fa-paste
+                span(translate) Paste
+            button.sftp-footer-action(*ngIf='selectedCount === 1', type='button', (click)='renameSelected(); $event.stopPropagation()')
+                i.fas.fa-i-cursor
+                span(translate) Rename
             button.sftp-footer-action.danger(type='button', (click)='deleteSelected(); $event.stopPropagation()')
                 i.fas.fa-trash-alt
                 span(translate) Delete
