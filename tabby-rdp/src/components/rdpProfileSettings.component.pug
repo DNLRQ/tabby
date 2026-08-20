@@ -1,0 +1,83 @@
+ul.nav-tabs(ngbNav, #nav='ngbNav')
+    li(ngbNavItem)
+        a(ngbNavLink, translate) General
+        ng-template(ngbNavContent)
+            .d-flex.w-100.mt-3
+                .mb-3.w-100.me-2
+                    label(translate) Host
+                    input.form-control(
+                        type='text',
+                        [(ngModel)]='profile.options.host',
+                    )
+
+                .mb-3
+                    label(translate) Port
+                    input.form-control(
+                        type='number',
+                        placeholder='3389',
+                        [(ngModel)]='profile.options.port',
+                    )
+
+            .mb-3
+                label(translate) Username
+                input.form-control(
+                    type='text',
+                    placeholder='Ask every time',
+                    [(ngModel)]='profile.options.user',
+                )
+
+            .mb-3
+                label(translate) Domain
+                input.form-control(
+                    type='text',
+                    [(ngModel)]='profile.options.domain',
+                )
+
+            .form-line(*ngIf='profile.options.user')
+                .header
+                    .title(translate) Password
+                    .description(*ngIf='!hasSavedPassword', translate) Save a password in the keychain
+                    .description(*ngIf='hasSavedPassword', translate) There is a saved password for this connection
+                button.btn.btn-success.ms-4(*ngIf='!hasSavedPassword', (click)='setPassword()')
+                    i.fas.fa-key
+                    span(translate) Set password
+                button.btn.btn-danger.ms-4(*ngIf='hasSavedPassword', (click)='clearSavedPassword()')
+                    i.fas.fa-trash-alt
+                    span(translate) Forget
+
+            .form-line
+                .header
+                    .title(translate) Network Level Authentication
+                    .description(translate) Required by most modern Windows hosts (NLA / CredSSP)
+                toggle([(ngModel)]='profile.options.nla')
+
+            .form-line
+                .header
+                    .title(translate) Clipboard
+                    .description(translate) Share the clipboard with the remote session
+                toggle([(ngModel)]='profile.options.clipboard')
+
+    li(ngbNavItem)
+        a(ngbNavLink, translate) Display
+        ng-template(ngbNavContent)
+            .form-line
+                .header
+                    .title(translate) Adaptive resolution
+                    .description(translate) Match the remote desktop size to this tab
+                toggle([(ngModel)]='profile.options.adaptiveResolution')
+
+            .d-flex.w-100(*ngIf='!profile.options.adaptiveResolution')
+                .mb-3.w-100.me-2
+                    label(translate) Width
+                    input.form-control(
+                        type='number',
+                        [(ngModel)]='profile.options.width',
+                    )
+                .mb-3
+                    label(translate) Height
+                    input.form-control(
+                        type='number',
+                        [(ngModel)]='profile.options.height',
+                    )
+
+div([ngbNavOutlet]='nav')

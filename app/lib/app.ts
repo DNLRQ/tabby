@@ -70,10 +70,19 @@ export class Application {
 
         if (process.platform === 'linux') {
             app.commandLine.appendSwitch('no-sandbox')
+            // Chromium's GPU process often cannot use /dev/shm (ESRCH) and
+            // falls back to software rendering, which makes canvas RDP unusable.
+            app.commandLine.appendSwitch('disable-dev-shm-usage')
             if ((this.configStore.appearance?.opacity || 1) !== 1) {
                 app.commandLine.appendSwitch('enable-transparent-visuals')
                 app.disableHardwareAcceleration()
             }
+        }
+        if (!this.configStore.hacks?.disableGPU) {
+            app.commandLine.appendSwitch('ignore-gpu-blocklist')
+            app.commandLine.appendSwitch('enable-gpu-rasterization')
+            app.commandLine.appendSwitch('enable-zero-copy')
+            app.commandLine.appendSwitch('enable-accelerated-2d-canvas')
         }
         if (this.configStore.hacks?.disableGPU) {
             app.commandLine.appendSwitch('disable-gpu')

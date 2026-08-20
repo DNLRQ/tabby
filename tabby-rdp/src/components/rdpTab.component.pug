@@ -1,0 +1,45 @@
+.rdp-tab
+    .rdp-toolbar
+        button.btn.btn-sm.btn-secondary(
+            (click)='reconnect()',
+            [disabled]='status === "connecting"',
+            ngbTooltip='Reconnect',
+            translate,
+        )
+            i.fas.fa-sync
+        button.btn.btn-sm.btn-secondary(
+            (click)='disconnect()',
+            [disabled]='status !== "connected"',
+            ngbTooltip='Disconnect',
+            translate,
+        )
+            i.fas.fa-plug
+        .btn-group
+            button.btn.btn-sm.btn-secondary(
+                [class.active]='scaleMode === "fit"',
+                (click)='setScaleMode("fit")',
+                translate,
+            ) Fit
+            button.btn.btn-sm.btn-secondary(
+                [class.active]='scaleMode === "actual"',
+                (click)='setScaleMode("actual")',
+            ) 1:1
+        .rdp-status
+            span(*ngIf='status === "connecting"', translate) Connecting
+            span(*ngIf='status === "connected"') {{profile.options.host}}
+            span.text-danger(*ngIf='status === "closed"') {{errorMessage || ('Disconnected' | translate)}}
+
+    .rdp-stage(#stage)
+        canvas.rdp-canvas(
+            #canvas,
+            tabindex='0',
+        )
+        .rdp-overlay(*ngIf='status !== "connected"')
+            .spinner-border(*ngIf='status === "connecting"', role='status')
+            .rdp-overlay-text(*ngIf='status === "connecting"', translate) Connecting
+            .rdp-overlay-text(*ngIf='status !== "connecting"') {{errorMessage || ('Disconnected' | translate)}}
+            button.btn.btn-primary.mt-3(
+                *ngIf='status === "closed"',
+                (click)='reconnect()',
+                translate,
+            ) Reconnect

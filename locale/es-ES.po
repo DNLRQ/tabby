@@ -2307,6 +2307,94 @@ msgstr "SFTP"
 msgid "SSH connection"
 msgstr "Conexión SSH"
 
+#: tabby-rdp/src/profiles.ts
+msgid "RDP connection"
+msgstr "Conexión RDP"
+
+#: tabby-rdp/src/hotkeys.ts
+msgid "Restart current RDP session"
+msgstr "Reiniciar la sesión RDP actual"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Network Level Authentication"
+msgstr "Autenticación a nivel de red"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Required by most modern Windows hosts (NLA / CredSSP)"
+msgstr "Obligatorio en la mayoría de equipos Windows modernos (NLA / CredSSP)"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Share the clipboard with the remote session"
+msgstr "Compartir el portapapeles con la sesión remota"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Adaptive resolution"
+msgstr "Resolución adaptativa"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Match the remote desktop size to this tab"
+msgstr "Ajustar el escritorio remoto al tamaño de esta pestaña"
+
+#: tabby-rdp/src/components/rdpTab.component.pug
+msgid "Fit"
+msgstr "Ajustar"
+
+#: tabby-rdp/src/session.ts
+msgid "RDP is not available in the web version"
+msgstr "RDP no está disponible en la versión web"
+
+#: tabby-rdp/src/session.ts
+msgid "Username is required"
+msgstr "El usuario es obligatorio"
+
+#: tabby-rdp/src/session.ts
+msgid "Password for {user}@{host}"
+msgstr "Contraseña para {user}@{host}"
+
+#: tabby-rdp/src/session.ts
+msgid "Incorrect password"
+msgstr "Contraseña incorrecta"
+
+#: tabby-rdp/src/session.ts
+msgid "Unable to log on"
+msgstr "No se pudo iniciar sesión"
+
+#: tabby-rdp/src/session.ts
+msgid "Access denied"
+msgstr "Acceso denegado"
+
+#: tabby-rdp/src/session.ts
+msgid "Connection failed"
+msgstr "La conexión ha fallado"
+
+#: tabby-settings/src/components/vaultSettingsTab.component.ts
+msgid "RDP password for {user}@{host}:{port}"
+msgstr "Contraseña RDP para {user}@{host}:{port}"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Domain"
+msgstr "Dominio"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Display"
+msgstr "Pantalla"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Width"
+msgstr "Ancho"
+
+#: tabby-rdp/src/components/rdpProfileSettings.component.pug
+msgid "Height"
+msgstr "Alto"
+
+#: tabby-rdp/src/components/rdpTab.component.ts
+msgid "Disconnected"
+msgstr "Desconectado"
+
+#: tabby-rdp/src/components/rdpSettingsTab.component.pug
+msgid "RDP connection management is now done through the \"Profiles & connections\" tab"
+msgstr "La gestión de conexiones RDP ahora se realiza a través de la pestaña \"Perfiles y conexiones\""
+
 #: locale/tmp-html/tabby-ssh/src/components/sshSettingsTab.component.html:47
 msgid "SSH connection management is now done through the \"Profiles & connections\" tab"
 msgstr "La gestión de conexiones SSH ahora se realiza a través de la pestaña \"Perfiles y conexiones\""

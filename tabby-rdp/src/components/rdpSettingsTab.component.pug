@@ -1,0 +1,11 @@
+h3 RDP
+
+.form-line
+    .header
+        .title(translate) Warn when closing active connections
+    toggle(
+        [(ngModel)]='config.store.rdp.warnOnClose',
+        (ngModelChange)='config.save()',
+    )
+
+.alert.alert-info(translate) RDP connection management is now done through the "Profiles & connections" tab

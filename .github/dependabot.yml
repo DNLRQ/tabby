@@ -66,6 +66,12 @@ updates:
     interval: daily
     time: "04:00"
   open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tabby-rdp"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
 - package-ecosystem: github-actions
   directory: "/"
   schedule:

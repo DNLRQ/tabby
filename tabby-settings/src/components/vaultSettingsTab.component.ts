@@ -88,6 +88,9 @@ export class VaultSettingsTabComponent extends BaseComponent {
         if (secret.type === 'ssh:password') {
             return this.translate.instant('SSH password for {user}@{host}:{port}', (secret as any).key)
         }
+        if (secret.type === 'rdp:password') {
+            return this.translate.instant('RDP password for {user}@{host}:{port}', (secret as any).key)
+        }
         if (secret.type === 'ssh:key-passphrase') {
             return this.translate.instant('Passphrase for a private key with hash {hash}...', { hash: (secret as any).key.hash.substring(0, 8) })
         }
