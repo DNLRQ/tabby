@@ -1,23 +1,137 @@
+diff --git a/node_modules/glasstron/src/native/linux_x11/index.js b/node_modules/glasstron/src/native/linux_x11/index.js
+index 474732f..0a6a936 100644
+--- a/node_modules/glasstron/src/native/linux_x11/index.js
++++ b/node_modules/glasstron/src/native/linux_x11/index.js
+@@ -31,12 +31,20 @@ module.exports = class LinuxX11 {
+ 	}
+ 
+ 	static async getXWindowManager(){
+-		const wmCheckProp = await x11.getAtomID("_NET_SUPPORTING_WM_CHECK");
+-		const wmCheck = await x11.getPropertyData(undefined, wmCheckProp);
+-		const wmid = utils.decodeNumbers(wmCheck.data)[0];
+-		const wmNameProp = await x11.getAtomID("_NET_WM_NAME");
+-		const data = await x11.getPropertyData(wmid, wmNameProp);
+-		return utils.decodeUTF8String(data.data)[0];
++		try {
++			const wmCheckProp = await x11.getAtomID("_NET_SUPPORTING_WM_CHECK");
++			const wmCheck = await x11.getPropertyData(undefined, wmCheckProp);
++			if (!wmCheck?.data?.length) return undefined;
++			const wmid = utils.decodeNumbers(wmCheck.data)[0];
++			if (!wmid) return undefined;
++			const wmNameProp = await x11.getAtomID("_NET_WM_NAME");
++			const data = await x11.getPropertyData(wmid, wmNameProp);
++			if (!data?.data?.length) return undefined;
++			return utils.decodeUTF8String(data.data)[0];
++		} catch (e) {
++			console.error(e);
++			return undefined;
++		}
+ 	}
+ 
+ 	static async getXProperty(xid, propName){
 diff --git a/node_modules/glasstron/src/native/linux_x11/x11.js b/node_modules/glasstron/src/native/linux_x11/x11.js
-index e38682a..5a9f214 100644
+index e0b97eb..e348e4e 100644
 --- a/node_modules/glasstron/src/native/linux_x11/x11.js
 +++ b/node_modules/glasstron/src/native/linux_x11/x11.js
-@@ -58,10 +58,16 @@ class X11Connection {
+@@ -24,14 +24,27 @@ module.exports = class X11 extends EventEmitter {
+ 
+ 	createConnection(){
+ 		return new Promise((resolve, reject) => {
+-			if(this.display) resolve();
++			if(this.display) {
++				resolve();
++				return;
++			}
+ 
+ 			x11.createClient((err, display) => {
+-				if (err) console.error(err);
++				if (err) {
++					console.error(err);
++					return reject(err);
++				}
+ 				this.display = display;
++				this.display.client.on("error", (e) => {
++					// X11 protocol errors (Bad atom, etc.) are common under Wayland/XWayland
++					console.error(e);
++				});
+ 				this.emit("connected");
+ 				resolve();
+-			}).on("error", reject);
++			}).on("error", (e) => {
++				if (!this.display) reject(e);
++				else console.error(e);
++			});
+ 		})
+ 	}
+ 
+@@ -57,15 +70,31 @@ module.exports = class X11 extends EventEmitter {
  				id = this.display.screen[0].root;
  
  			this.display.client.GetProperty(0, id, prop, 0, 0, 10000000, (err, propData) => {
 -				if(err) console.error(err);
 +				if(err) {
 +					console.error(err);
-+					return reject(err);
++					resolve({ type: 0, data: Buffer.alloc(0) });
++					return true;
++				}
++
++				// Missing properties have type 0 (None). GetAtomName(0) throws Bad atom on Wayland.
++				if (!propData || !propData.type) {
++					resolve({ type: 0, data: Buffer.alloc(0) });
++					return true;
 +				}
  
  				this.display.client.GetAtomName(propData.type, (err, typeName) => {
 -					if(err) console.error(err);
 +					if(err) {
 +						console.error(err);
-+						return reject(err);
++						resolve({ ...propData, typeName: undefined });
++						return true;
 +					}
  
  					propData.typeName = typeName;
  					resolve(propData);
++					return true;
+ 				});
+ 
++				return true;
+ 			});
+ 	
+ 		});
+diff --git a/node_modules/glasstron/src/platforms/linux.js b/node_modules/glasstron/src/platforms/linux.js
+index 100f885..dea8fe0 100644
+--- a/node_modules/glasstron/src/platforms/linux.js
++++ b/node_modules/glasstron/src/platforms/linux.js
+@@ -32,17 +32,21 @@ module.exports = class Linux extends Platform {
+ 	
+ 	// eslint-disable-next-line no-unused-vars
+ 	static async asyncInit(win, _options){
+-		await x11.createConnection();
+-
+-		const wm = await Linux._getXWindowManager();
+-		switch(wm){
+-			case "KWin":
+-				// Update the kwin blur property
+-				// eslint-disable-next-line no-case-declarations
+-				const updateKWin = async () => {if(win.blurCornerRadius !== 0) this._kwin_setBlur(win, await this._kwin_getBlur(win));};
+-				win.on("will-resize", updateKWin);
+-				win.on("resize", updateKWin);
+-				break;
++		try {
++			await x11.createConnection();
++
++			const wm = await Linux._getXWindowManager();
++			switch(wm){
++				case "KWin":
++					// Update the kwin blur property
++					// eslint-disable-next-line no-case-declarations
++					const updateKWin = async () => {if(win.blurCornerRadius !== 0) this._kwin_setBlur(win, await this._kwin_getBlur(win));};
++					win.on("will-resize", updateKWin);
++					win.on("resize", updateKWin);
++					break;
++			}
++		} catch (e) {
++			console.error(e);
+ 		}
+ 	}
+ 

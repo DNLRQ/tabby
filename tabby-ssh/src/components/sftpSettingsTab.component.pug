@@ -1,0 +1,67 @@
+h3(translate) SFTP
+
+.mb-4.text-muted(translate) Choose how the file manager looks and how you open, select and upload files.
+
+h3(translate) Appearance
+
+.form-line
+    .header
+        .title(translate) Preferred view
+        .description(translate) Default layout when you open SFTP
+    select.form-control(
+        [(ngModel)]='config.store.ssh.sftp.viewMode',
+        (ngModelChange)='config.save()',
+    )
+        option(value='grid', translate) Grid view
+        option(value='list', translate) List view
+
+.form-line
+    .header
+        .title(translate) Show hidden files
+        .description(translate) Show dotfiles like .bashrc when SFTP opens
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.showHidden',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
+        .title(translate) Show download button on hover
+        .description(translate) Display a download icon on each file
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.showDownloadButton',
+        (ngModelChange)='config.save()',
+    )
+
+h3(translate) Interaction
+
+.form-line
+    .header
+        .title(translate) Open with
+        .description(translate) How folders and files open in the SFTP panel
+    select.form-control(
+        [(ngModel)]='config.store.ssh.sftp.openOn',
+        (ngModelChange)='config.save()',
+    )
+        option(value='doubleClick', translate) Double-click
+        option(value='singleClick', translate) Single-click
+
+.form-line
+    .header
+        .title(translate) Multi-select
+        .description(translate) Use Ctrl or Shift plus click to select several items
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.multiSelect',
+        (ngModelChange)='config.save()',
+    )
+
+h3(translate) Transfers
+
+.form-line
+    .header
+        .title(translate) Drag and drop uploads
+        .description(translate) Drop files from your computer into the current folder
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.dragAndDrop',
+        (ngModelChange)='config.save()',
+    )

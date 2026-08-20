@@ -11,6 +11,7 @@ import { SSHPortForwardingModalComponent } from './sshPortForwardingModal.compon
 import { SSHProfile } from '../api'
 import { SSHShellSession } from '../session/shell'
 import { SSHMultiplexerService } from '../services/sshMultiplexer.service'
+import { SFTPTabComponent } from './sftpTab.component'
 
 /** @hidden */
 @Component({
@@ -222,8 +223,32 @@ export class SSHTabComponent extends ConnectableTerminalTabComponent<SSHProfile>
         }, 100)
     }
 
+    async openSFTPWindow (): Promise<void> {
+        if (!this.sshSession) {
+            return
+        }
+        this.sftpPath = await this.session?.getWorkingDirectory() ?? this.sftpPath
+        this.app.openNewTab({
+            type: SFTPTabComponent,
+            inputs: {
+                sshSession: this.sshSession,
+                profile: this.profile,
+                path: this.sftpPath,
+            },
+        })
+        this.sftpPanelVisible = false
+    }
+
+    async openNewConnectionWindow (): Promise<void> {
+        await this.profilesService.openNewTabForProfile(this.profile)
+    }
+
     @HostListener('click')
     onClick (): void {
+        this.sftpPanelVisible = false
+    }
+
+    onBeforeAppQuit (): void {
         this.sftpPanelVisible = false
     }
 

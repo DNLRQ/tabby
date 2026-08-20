@@ -4,6 +4,7 @@ import { TranslateService } from '@ngx-translate/core'
 
 import { HostAppService, Platform } from './api/hostApp'
 import { ProfilesService } from './services/profiles.service'
+import { ConfigService } from './services/config.service'
 import { CommandProvider, Command, CommandLocation } from './api/commands'
 
 /** @hidden */
@@ -12,6 +13,7 @@ export class CoreCommandProvider extends CommandProvider {
     constructor (
         private hostApp: HostAppService,
         private profilesService: ProfilesService,
+        private config: ConfigService,
         private translate: TranslateService,
     ) {
         super()
@@ -35,7 +37,7 @@ export class CoreCommandProvider extends CommandProvider {
                     : require('./icons/profiles.svg'),
                 run: async () => this.activate(),
             },
-            ...this.profilesService.getRecentProfiles().map((profile, index) => ({
+            ...(!this.config.store.showQuickAccess ? this.profilesService.getRecentProfiles().map((profile, index) => ({
                 id: `core:recent-profile-${index}`,
                 label: profile.name,
                 locations: [CommandLocation.StartPage],
@@ -44,7 +46,7 @@ export class CoreCommandProvider extends CommandProvider {
                     const p = (await this.profilesService.getProfiles()).find(x => x.id === profile.id) ?? profile
                     this.profilesService.launchProfile(p)
                 },
-            })),
+            })) : []),
         ]
     }
 }

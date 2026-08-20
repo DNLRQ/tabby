@@ -11,6 +11,14 @@ export class SSHConfigProvider extends ConfigProvider {
             x11Display: null,
             knownHosts: [],
             verifyHostKeys: true,
+            sftp: {
+                viewMode: 'grid',
+                showHidden: false,
+                openOn: 'doubleClick',
+                multiSelect: true,
+                dragAndDrop: true,
+                showDownloadButton: true,
+            },
         },
         hotkeys: {
             'restart-ssh-session': [],

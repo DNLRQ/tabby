@@ -62,6 +62,24 @@
                     h3(translate) Application settings
                     .form-line
                         .header
+                            .title(translate) Quick access
+                            .description(translate) Show the last 5 connections as cards on the home screen
+                        toggle(
+                            [(ngModel)]='config.store.showQuickAccess',
+                            (ngModelChange)='saveConfiguration()',
+                        )
+
+                    .form-line
+                        .header
+                            .title(translate) New connection button
+                            .description(translate) Show a New connection button on the home screen
+                        toggle(
+                            [(ngModel)]='config.store.showNewConnectionButton',
+                            (ngModelChange)='saveConfiguration()',
+                        )
+
+                    .form-line
+                        .header
                             .title(translate) Language
                             a.description((click)='homeBase.openTranslations()')
                                 span(translate) Help translate Tabby

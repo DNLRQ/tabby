@@ -2,7 +2,7 @@ import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { Component, Input, Injector, Inject, Optional } from '@angular/core'
 import { BaseTabProcess, WIN_BUILD_CONPTY_SUPPORTED, isWindowsBuild, GetRecoveryTokenOptions } from 'tabby-core'
 import { BaseTerminalTabComponent } from 'tabby-terminal'
-import { LocalProfile, SessionOptions, UACService } from '../api'
+import { LocalProfile, SessionOptions, UACService, ChildProcess } from '../api'
 import { Session } from '../session'
 
 /** @hidden */
@@ -102,7 +102,15 @@ export class TerminalTabComponent extends BaseTerminalTabComponent<LocalProfile>
     }
 
     async canClose (): Promise<boolean> {
-        const children = await this.session?.getChildProcesses()
+        let children: ChildProcess[] = []
+        try {
+            children = await Promise.race([
+                this.session?.getChildProcesses() ?? Promise.resolve([]),
+                new Promise<ChildProcess[]>((_, reject) => setTimeout(() => reject(new Error('timeout')), 150)),
+            ]) as ChildProcess[]
+        } catch {
+            return true
+        }
         if (!children?.length) {
             return true
         }

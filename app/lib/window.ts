@@ -203,7 +203,9 @@ export class Window {
             }
         } else if (process.platform === 'linux') {
             this.window.setBackgroundColor(enabled ? '#00000000' : '#131d27')
-            this.window.setBlur(enabled)
+            Promise.resolve(this.window.setBlur(enabled)).catch(error => {
+                console.error('Failed to set window blur', error)
+            })
         } else {
             this.window.setVibrancy(enabled ? macOSVibrancyType : null)
         }

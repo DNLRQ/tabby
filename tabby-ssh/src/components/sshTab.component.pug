@@ -25,9 +25,13 @@ terminal-toolbar([tab]='this')
         i.fas.fa-redo
         span(translate) Reconnect
 
-    button.btn.btn-sm.btn-link.me-2((click)='openSFTP()', *ngIf='session && session.open')
-        i.far.fa-folder-open
+    button.btn.btn-sm.btn-link.sftp-open-btn.me-2((click)='openSFTP()', *ngIf='session && session.open')
+        i.fas.fa-folder-open
         span SFTP
+
+    button.btn.btn-sm.btn-link.me-2((click)='openNewConnectionWindow()', *ngIf='session && session.open')
+        i.fas.fa-clone
+        span(translate) New window
 
     button.btn.btn-sm.btn-link(
         *ngIf='session && session.open && hostApp.platform !== Platform.Web',
@@ -37,7 +41,7 @@ terminal-toolbar([tab]='this')
         span(translate) Ports
 
 
-sftp-panel.bg-dark(
+sftp-panel(
     @panelSlide,
     [@.disabled]='!config.store.accessibility.animations',
     [(path)]='sftpPath',
@@ -45,7 +49,8 @@ sftp-panel.bg-dark(
     (click)='$event.stopPropagation()',
     [session]='sshSession!',
     [cwdDetectionAvailable]='session?.supportsWorkingDirectory() ?? false',
-    (closed)='sftpPanelVisible = false'
+    (closed)='sftpPanelVisible = false',
+    (newWindow)='openSFTPWindow()'
 )
 
 keyboard-interactive-auth-panel.bg-dark(

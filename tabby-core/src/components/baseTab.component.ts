@@ -88,6 +88,11 @@ export abstract class BaseTabComponent extends BaseComponent {
     hasFocus = false
 
     /**
+     * If true, this tab is closed on quit and is never restored on next launch.
+     */
+    skipRecovery = false
+
+    /**
      * Ping this if your recovery state has been changed and you want
      * your tab state to be saved sooner
      */
@@ -196,6 +201,11 @@ export abstract class BaseTabComponent extends BaseComponent {
     async canClose (): Promise<boolean> {
         return true
     }
+
+    /**
+     * Called when the application window is about to close.
+     */
+    onBeforeAppQuit (): void { }
 
     emitFocused (): void {
         this.focused.next()

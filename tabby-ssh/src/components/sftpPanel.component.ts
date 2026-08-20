@@ -1,16 +1,27 @@
 import * as C from 'constants'
 import { posix as path } from 'path'
-import { Component, Input, Output, EventEmitter, Inject, Optional } from '@angular/core'
-import { FileUpload, DirectoryUpload, DirectoryDownload, MenuItemOptions, NotificationsService, PlatformService } from 'tabby-core'
+import { Component, Input, Output, EventEmitter, Inject, Optional, HostListener, HostBinding, OnDestroy } from '@angular/core'
+import { Subscription } from 'rxjs'
+import { FileUpload, DirectoryUpload, DirectoryDownload, MenuItemOptions, NotificationsService, PlatformService, TranslateService, ConfigService } from 'tabby-core'
 import { SFTPSession, SFTPFile } from '../session/sftp'
 import { SSHSession } from '../session/ssh'
 import { SFTPContextMenuItemProvider } from '../api'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { SFTPCreateDirectoryModalComponent } from './sftpCreateDirectoryModal.component'
+import { SFTPDeleteModalComponent } from './sftpDeleteModal.component'
 
 interface PathSegment {
     name: string
     path: string
+}
+
+interface SFTPUserConfig {
+    viewMode: 'grid' | 'list'
+    showHidden: boolean
+    openOn: 'doubleClick' | 'singleClick'
+    multiSelect: boolean
+    dragAndDrop: boolean
+    showDownloadButton: boolean
 }
 
 @Component({
@@ -18,30 +29,63 @@ interface PathSegment {
     templateUrl: './sftpPanel.component.pug',
     styleUrls: ['./sftpPanel.component.scss'],
 })
-export class SFTPPanelComponent {
+export class SFTPPanelComponent implements OnDestroy {
     @Input() session: SSHSession
+    @Input() path = '/'
+    @Input() cwdDetectionAvailable = false
+    @Input() standalone = false
     @Output() closed = new EventEmitter<void>()
+    @Output() pathChange = new EventEmitter<string>()
+    @Output() newWindow = new EventEmitter<void>()
     sftp: SFTPSession
     fileList: SFTPFile[]|null = null
     filteredFileList: SFTPFile[] = []
-    @Input() path = '/'
-    @Output() pathChange = new EventEmitter<string>()
     pathSegments: PathSegment[] = []
-    @Input() cwdDetectionAvailable = false
     editingPath: string|null = null
-    showFilter = false
     filterText = ''
+    viewMode: 'grid' | 'list' = 'grid'
+    showHidden = false
+    isDragging = false
+    private dragDepth = 0
+    private selected = new Set<string>()
+    private anchorPath: string | null = null
+    private configSub: Subscription | null = null
 
     constructor (
         private ngbModal: NgbModal,
         private notifications: NotificationsService,
+        private translate: TranslateService,
+        private config: ConfigService,
         public platform: PlatformService,
         @Optional() @Inject(SFTPContextMenuItemProvider) protected contextMenuProviders: SFTPContextMenuItemProvider[],
     ) {
+        this.contextMenuProviders = this.contextMenuProviders ?? []
         this.contextMenuProviders.sort((a, b) => a.weight - b.weight)
+        this.applySftpSettings()
+    }
+
+    get sftpConfig (): SFTPUserConfig {
+        return this.config.store.ssh.sftp
+    }
+
+    @HostBinding('class.standalone')
+    get standaloneClass (): boolean {
+        return this.standalone
+    }
+
+    ngOnDestroy (): void {
+        this.configSub?.unsubscribe()
+    }
+
+    private applySftpSettings (): void {
+        const sftp = this.sftpConfig
+        this.viewMode = sftp.viewMode === 'list' ? 'list' : 'grid'
+        this.showHidden = !!sftp.showHidden
+        this.updateFilteredList()
     }
 
     async ngOnInit (): Promise<void> {
+        this.configSub = this.config.changed$.subscribe(() => this.applySftpSettings())
         this.sftp = await this.session.openSFTP()
         try {
             await this.navigate(this.path)
@@ -58,6 +102,7 @@ export class SFTPPanelComponent {
         this.pathChange.next(this.path)
 
         this.clearFilter()
+        this.clearSelection()
 
         let p = newPath
         this.pathSegments = []
@@ -94,16 +139,16 @@ export class SFTPPanelComponent {
     }
 
     getFileType (fileExtension: string): string {
-        const codeExtensions = ['js', 'ts', 'py', 'java', 'cpp', 'h', 'cs', 'html', 'css', 'rb', 'php', 'swift', 'go', 'kt', 'sh', 'json', 'cc', 'c', 'xml']
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp']
+        const codeExtensions = ['js', 'ts', 'py', 'java', 'cpp', 'h', 'cs', 'html', 'css', 'rb', 'php', 'swift', 'go', 'kt', 'sh', 'json', 'cc', 'c', 'xml', 'yml', 'yaml', 'md', 'rs', 'vue', 'tsx', 'jsx', 'sql']
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico']
         const pdfExtensions = ['pdf']
-        const archiveExtensions = ['zip', 'rar', 'tar', 'gz']
-        const wordExtensions = ['doc', 'docx']
-        const videoExtensions = ['mp4', 'avi', 'mkv', 'mov']
+        const archiveExtensions = ['zip', 'rar', 'tar', 'gz', '7z', 'bz2', 'xz', 'tgz']
+        const wordExtensions = ['doc', 'docx', 'odt']
+        const videoExtensions = ['mp4', 'avi', 'mkv', 'mov', 'webm']
         const powerpointExtensions = ['ppt', 'pptx']
-        const textExtensions = ['txt', 'log']
-        const audioExtensions = ['mp3', 'wav', 'flac']
-        const excelExtensions = ['xls', 'xlsx']
+        const textExtensions = ['txt', 'log', 'ini', 'conf', 'cfg']
+        const audioExtensions = ['mp3', 'wav', 'flac', 'ogg', 'm4a']
+        const excelExtensions = ['xls', 'xlsx', 'csv']
 
         const lowerCaseExtension = fileExtension.toLowerCase()
 
@@ -132,30 +177,251 @@ export class SFTPPanelComponent {
         }
     }
 
-    getIcon (item: SFTPFile): string {
+    getKind (item: SFTPFile): string {
         if (item.isDirectory) {
-            return 'fas fa-folder text-info'
+            return 'folder'
         }
         if (item.isSymlink) {
-            return 'fas fa-link text-warning'
+            return 'link'
         }
         const fileMatch = /\.([^.]+)$/.exec(item.name)
         const extension = fileMatch ? fileMatch[1] : null
-        if (extension !== null) {
-            const fileType = this.getFileType(extension)
-
-            switch (fileType) {
-                case 'unknown':
-                    return 'fas fa-file'
-                default:
-                    return `fa-solid fa-file-${fileType} `
-            }
+        if (!extension) {
+            return 'file'
         }
-        return 'fas fa-file'
+        const fileType = this.getFileType(extension)
+        return fileType === 'unknown' ? 'file' : fileType
+    }
+
+    kindClass (item: SFTPFile): string {
+        return `kind-${this.getKind(item)}`
+    }
+
+    getIcon (item: SFTPFile): string {
+        const kind = this.getKind(item)
+        switch (kind) {
+            case 'folder':
+                return 'fas fa-folder'
+            case 'link':
+                return 'fas fa-link'
+            case 'unknown':
+            case 'file':
+                return 'fas fa-file'
+            case 'text':
+                return 'fas fa-file-alt'
+            case 'archive':
+                return 'fas fa-file-archive'
+            default:
+                return `fas fa-file-${kind}`
+        }
     }
 
     goUp (): void {
         this.navigate(path.dirname(this.path))
+    }
+
+    onItemClick (item: SFTPFile, event: MouseEvent): void {
+        event.preventDefault()
+        event.stopPropagation()
+
+        const multi = this.sftpConfig.multiSelect
+        const ctrl = multi && (event.ctrlKey || event.metaKey)
+        const shift = multi && event.shiftKey
+
+        if (shift && this.anchorPath) {
+            this.selectRange(this.anchorPath, item.fullPath)
+            return
+        }
+
+        if (ctrl) {
+            this.toggleSelected(item)
+            this.anchorPath = item.fullPath
+            return
+        }
+
+        this.selected = new Set([item.fullPath])
+        this.anchorPath = item.fullPath
+
+        if (this.sftpConfig.openOn === 'singleClick') {
+            this.open(item)
+        }
+    }
+
+    onItemDblClick (item: SFTPFile, event: MouseEvent): void {
+        event.preventDefault()
+        event.stopPropagation()
+        if (this.sftpConfig.openOn === 'doubleClick') {
+            this.open(item)
+        }
+    }
+
+    onBackgroundClick (event: MouseEvent): void {
+        if (event.target === event.currentTarget) {
+            this.clearSelection()
+        }
+    }
+
+    isSelected (item: SFTPFile): boolean {
+        return this.selected.has(item.fullPath)
+    }
+
+    get selectedCount (): number {
+        return this.selected.size
+    }
+
+    get selectedItems (): SFTPFile[] {
+        return this.filteredFileList.filter(item => this.selected.has(item.fullPath))
+    }
+
+    clearSelection (): void {
+        this.selected = new Set()
+    }
+
+    async downloadSelected (): Promise<void> {
+        for (const item of this.selectedItems) {
+            await this.downloadItem(item)
+        }
+    }
+
+    async deleteSelected (): Promise<void> {
+        const items = this.selectedItems
+        if (!items.length) {
+            return
+        }
+
+        const confirmed = (await this.platform.showMessageBox({
+            type: 'warning',
+            message: items.length === 1
+                ? this.translate.instant('Delete {fullPath}?', items[0])
+                : this.translate.instant('Delete {count} items?', { count: items.length }),
+            defaultId: 0,
+            cancelId: 1,
+            buttons: [
+                this.translate.instant('Delete'),
+                this.translate.instant('Cancel'),
+            ],
+        })).response === 0
+
+        if (!confirmed) {
+            return
+        }
+
+        if (items.length === 1) {
+            const modal = this.ngbModal.open(SFTPDeleteModalComponent)
+            modal.componentInstance.item = items[0]
+            modal.componentInstance.sftp = this.sftp
+            await modal.result.catch(() => null)
+        } else {
+            for (const item of items) {
+                await this.deleteRecursive(item)
+            }
+        }
+        this.clearSelection()
+        await this.navigate(this.path)
+    }
+
+    private async deleteRecursive (file: SFTPFile): Promise<void> {
+        if (file.isDirectory) {
+            for (const child of await this.sftp.readdir(file.fullPath)) {
+                await this.deleteRecursive(child)
+            }
+            await this.sftp.rmdir(file.fullPath)
+        } else {
+            await this.sftp.unlink(file.fullPath)
+        }
+    }
+
+    private toggleSelected (item: SFTPFile): void {
+        const next = new Set(this.selected)
+        if (next.has(item.fullPath)) {
+            next.delete(item.fullPath)
+        } else {
+            next.add(item.fullPath)
+        }
+        this.selected = next
+    }
+
+    private selectRange (fromPath: string, toPath: string): void {
+        const list = this.filteredFileList
+        const start = list.findIndex(item => item.fullPath === fromPath)
+        const end = list.findIndex(item => item.fullPath === toPath)
+        if (start < 0 || end < 0) {
+            this.selected = new Set([toPath])
+            return
+        }
+        const [from, to] = start < end ? [start, end] : [end, start]
+        this.selected = new Set(list.slice(from, to + 1).map(item => item.fullPath))
+    }
+
+    onDragEnter (event: DragEvent): void {
+        if (!this.sftpConfig.dragAndDrop || !this.hasFiles(event)) {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        this.dragDepth++
+        this.isDragging = true
+    }
+
+    onDragOver (event: DragEvent): void {
+        if (!this.sftpConfig.dragAndDrop || !this.hasFiles(event)) {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'copy'
+        }
+    }
+
+    onDragLeave (event: DragEvent): void {
+        if (!this.hasFiles(event) && this.dragDepth === 0) {
+            return
+        }
+        event.preventDefault()
+        this.dragDepth = Math.max(0, this.dragDepth - 1)
+        if (this.dragDepth === 0) {
+            this.isDragging = false
+        }
+    }
+
+    async onDrop (event: DragEvent): Promise<void> {
+        event.preventDefault()
+        event.stopPropagation()
+        this.dragDepth = 0
+        this.isDragging = false
+        if (!this.sftpConfig.dragAndDrop) {
+            return
+        }
+        const transfer = await this.platform.startUploadFromDragEvent(event, true)
+        if (!transfer.getChildrens().length) {
+            return
+        }
+        await this.uploadOneFolder(transfer)
+    }
+
+    private hasFiles (event: DragEvent): boolean {
+        return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+    }
+
+    @HostListener('document:keydown', ['$event'])
+    onKeydown (event: KeyboardEvent): void {
+        const target = event.target as HTMLElement | null
+        if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) {
+            return
+        }
+
+        if (event.key === 'Escape' && this.selected.size) {
+            this.clearSelection()
+            event.preventDefault()
+            return
+        }
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && this.sftpConfig.multiSelect && this.filteredFileList.length) {
+            event.preventDefault()
+            this.selected = new Set(this.filteredFileList.map(item => item.fullPath))
+            this.anchorPath = this.filteredFileList[0]?.fullPath ?? null
+        }
     }
 
     async open (item: SFTPFile): Promise<void> {
@@ -341,6 +607,11 @@ export class SFTPPanelComponent {
 
     async showContextMenu (item: SFTPFile, event: MouseEvent): Promise<void> {
         event.preventDefault()
+        event.stopPropagation()
+        if (!this.selected.has(item.fullPath)) {
+            this.selected = new Set([item.fullPath])
+            this.anchorPath = item.fullPath
+        }
         this.platform.popupContextMenu(await this.buildContextMenu(item), event)
     }
 
@@ -368,8 +639,44 @@ export class SFTPPanelComponent {
         this.closed.emit()
     }
 
+    openNewWindow (): void {
+        this.newWindow.emit()
+    }
+
+    get hostLabel (): string {
+        const options = this.session?.profile?.options
+        if (!options?.host) {
+            return ''
+        }
+        return options.user ? `${options.user}@${options.host}` : options.host
+    }
+
+    get folderCount (): number {
+        return this.filteredFileList.filter(item => item.isDirectory).length
+    }
+
+    get fileCount (): number {
+        return this.filteredFileList.filter(item => !item.isDirectory).length
+    }
+
+    setViewMode (mode: 'grid' | 'list'): void {
+        this.viewMode = mode
+        this.config.store.ssh.sftp.viewMode = mode
+        this.config.save()
+    }
+
+    toggleHidden (): void {
+        this.showHidden = !this.showHidden
+        this.config.store.ssh.sftp.showHidden = this.showHidden
+        this.config.save()
+        this.updateFilteredList()
+    }
+
+    trackByPath (_: number, item: SFTPFile): string {
+        return item.fullPath
+    }
+
     clearFilter (): void {
-        this.showFilter = false
         this.filterText = ''
         this.updateFilteredList()
     }
@@ -384,13 +691,19 @@ export class SFTPPanelComponent {
             return
         }
 
-        if (!this.showFilter || this.filterText.trim() === '') {
-            this.filteredFileList = this.fileList
+        let files = this.fileList
+        if (!this.showHidden) {
+            files = files.filter(item => !item.name.startsWith('.'))
+        }
+
+        if (this.filterText.trim() === '') {
+            this.filteredFileList = files
             return
         }
 
-        this.filteredFileList = this.fileList.filter(item =>
-            item.name.toLowerCase().includes(this.filterText.toLowerCase()),
+        const query = this.filterText.toLowerCase()
+        this.filteredFileList = files.filter(item =>
+            item.name.toLowerCase().includes(query),
         )
     }
 }

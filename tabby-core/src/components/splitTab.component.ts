@@ -108,16 +108,27 @@ export class SplitContainer {
 
     async serialize (tabsRecovery: TabRecoveryService, options?: GetRecoveryTokenOptions): Promise<RecoveryToken> {
         const children: any[] = []
-        for (const child of this.children) {
+        const ratios: number[] = []
+        for (let i = 0; i < this.children.length; i++) {
+            const child = this.children[i]
             if (child instanceof SplitContainer) {
-                children.push(await child.serialize(tabsRecovery, options))
-            } else {
-                children.push(await tabsRecovery.getFullRecoveryToken(child, options))
+                const serialized = await child.serialize(tabsRecovery, options)
+                if (serialized.children?.length) {
+                    children.push(serialized)
+                    ratios.push(this.ratios[i])
+                }
+            } else if (!child.skipRecovery) {
+                const token = await tabsRecovery.getFullRecoveryToken(child, options)
+                if (token) {
+                    children.push(token)
+                    ratios.push(this.ratios[i])
+                }
             }
         }
+        const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
         return {
             type: 'app:split-tab',
-            ratios: this.ratios,
+            ratios: total > 0 ? ratios.map(ratio => ratio / total) : ratios,
             orientation: this.orientation,
             children,
         }
@@ -738,7 +749,11 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
 
     /** @hidden */
     async getRecoveryToken (options?: GetRecoveryTokenOptions): Promise<any> {
-        return this.root.serialize(this.tabRecovery, options)
+        const token = await this.root.serialize(this.tabRecovery, options)
+        if (!token.children?.length) {
+            return null
+        }
+        return token
     }
 
     /** @hidden */
@@ -1039,7 +1054,9 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
             if (childState.type === 'app:split-tab') {
                 const child = new SplitContainer()
                 await this.recoverContainer(child, childState)
-                children.push(child)
+                if (child.children.length) {
+                    children.push(child)
+                }
             } else {
                 const recovered = await this.tabRecovery.recoverTab(childState)
                 if (recovered) {
@@ -1059,11 +1076,26 @@ export class SplitTabComponent extends BaseTabComponent implements AfterViewInit
     }
 }
 
+function splitTokenHasRecoverableChildren (token: RecoveryToken): boolean {
+    if (!Array.isArray(token?.children)) {
+        return false
+    }
+    return token.children.some(child => {
+        if (!child?.type) {
+            return false
+        }
+        if (child.type === 'app:split-tab') {
+            return splitTokenHasRecoverableChildren(child)
+        }
+        return true
+    })
+}
+
 /** @hidden */
 @Injectable({ providedIn: 'root' })
 export class SplitTabRecoveryProvider extends TabRecoveryProvider<SplitTabComponent> {
     async applicableTo (recoveryToken: RecoveryToken): Promise<boolean> {
-        return recoveryToken.type === 'app:split-tab'
+        return recoveryToken.type === 'app:split-tab' && splitTokenHasRecoverableChildren(recoveryToken)
     }
 
     async recover (recoveryToken: RecoveryToken): Promise<NewTabParameters<SplitTabComponent>> {

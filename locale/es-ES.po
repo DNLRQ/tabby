@@ -512,6 +512,10 @@ msgstr "Modo oscuro"
 msgid "Data bits"
 msgstr "Bits de datos"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Date"
+msgstr "Fecha"
+
 #: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html:80
 msgid "Debugging"
 msgstr "Depuración"
@@ -579,6 +583,10 @@ msgstr "¿Eliminar \"{name}\"?"
 #: tabby-ssh/src/sftpContextMenu.ts:35
 msgid "Delete {fullPath}?"
 msgstr "¿Eliminar la ruta {fullPath}?"
+
+#: tabby-ssh/src/components/sftpPanel.component.ts
+msgid "Delete {count} items?"
+msgstr "¿Eliminar {count} elementos?"
 
 #: tabby-terminal/src/hotkeys.ts:42
 msgid "Delete entire line"
@@ -704,6 +712,18 @@ msgstr "Acoplamiento"
 msgid "Double-click selection will stop at these characters"
 msgstr "La selección con doble clic se detendrá en estos caracteres"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Drop files here or use the upload buttons"
+msgstr "Suelta archivos aquí o usa los botones de subir"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Drop files to upload"
+msgstr "Suelta archivos para subir"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Drop files to upload here"
+msgstr "Suelta archivos aquí para subirlos"
+
 #: tabby-core/src/tabContextMenu.ts:79
 msgid "Down"
 msgstr "Abajo"
@@ -737,6 +757,10 @@ msgstr "Editar"
 #: tabby-electron/src/sftpContextMenu.ts:35
 msgid "Edit locally"
 msgstr "Editar localmente"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Empty folder"
+msgstr "Carpeta vacía"
 
 #: locale/tmp-html/tabby-plugin-manager/src/components/pluginsSettingsTab.component.html:58
 msgid "Enable"
@@ -823,6 +847,18 @@ msgstr "Transferencias de archivos"
 #: tabby-settings/src/components/vaultSettingsTab.component.ts:96
 msgid "File: {description}"
 msgstr "Archivo: {description}"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "files"
+msgstr "archivos"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Folder"
+msgstr "Carpeta"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "folders"
+msgstr "carpetas"
 
 #: tabby-settings/src/components/profilesSettingsTab.component.ts:9
 msgid "Filter"
@@ -979,6 +1015,10 @@ msgstr "Le da a la ventana un fondo transparente borroso"
 msgid "Go up"
 msgstr "Ir arriba"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Grid view"
+msgstr "Vista de cuadrícula"
+
 #: tabby-core/src/utils.ts:61
 msgid "Green"
 msgstr "Verde"
@@ -1007,6 +1047,10 @@ msgstr "Hexadecimal"
 #: locale/tmp-html/tabby-settings/src/components/profilesSettingsTab.component.html:49
 msgid "Hide"
 msgstr "Ocultar"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Hide hidden files"
+msgstr "Ocultar archivos ocultos"
 
 #: locale/tmp-html/tabby-settings/src/components/windowSettingsTab.component.html:176
 msgid "Hide tab close button"
@@ -1225,6 +1269,10 @@ msgstr "Línea por línea"
 msgid "Line editor, input is sent after you press Enter"
 msgstr "Editor de línea, la entrada se envía después de pulsar Enter"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "List view"
+msgstr "Vista de lista"
+
 #: locale/tmp-html/tabby-terminal/src/components/appearanceSettingsTab.component.html:83
 msgid "Line padding"
 msgstr "Relleno de línea"
@@ -1335,6 +1383,15 @@ msgstr "Nueva configuración en {platform}"
 msgid "New group name"
 msgstr "Nuevo nombre del grupo"
 
+#: tabby-settings/src/commands.ts
+#: locale/tmp-html/tabby-core/src/components/startPage.component.html
+msgid "New connection"
+msgstr "Nueva conexión"
+
+#: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html
+msgid "New connection button"
+msgstr "Botón de nueva conexión"
+
 #: locale/tmp-html/tabby-terminal/src/components/loginScriptsSettings.component.html:16
 msgid "New item"
 msgstr "Nuevo elemento"
@@ -1391,6 +1448,14 @@ msgstr "Sin color"
 #: locale/tmp-html/tabby-terminal/src/components/terminalSettingsTab.component.html:85
 msgid "No modifier"
 msgstr "Sin modificador"
+
+#: locale/tmp-html/tabby-core/src/components/startPage.component.html:22
+msgid "No recent connections"
+msgstr "Sin conexiones recientes"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "No matching files"
+msgstr "Ningún archivo coincide"
 
 #: locale/tmp-html/tabby-serial/src/components/serialProfileSettings.component.html:41
 msgid "None"
@@ -1459,6 +1524,14 @@ msgstr "Abrir pestaña de ajustes: {tab}"
 #: tabby-ssh/src/tabContextMenu.ts:25
 msgid "Open SFTP panel"
 msgstr "Abrir panel SFTP"
+
+#: tabby-ssh/src/tabContextMenu.ts
+msgid "Open SFTP in a tab"
+msgstr "Abrir SFTP en una pestaña"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Open in tab"
+msgstr "Abrir en pestaña"
 
 #: locale/tmp-html/tabby-terminal/src/components/loginScriptsSettings.component.html:10
 msgid "Optional"
@@ -1661,6 +1734,11 @@ msgstr "Morado"
 msgid "Puts all of Tabby's configuration into the vault"
 msgstr "Poner toda la configuración de Tabby en la vault"
 
+#: locale/tmp-html/tabby-core/src/components/startPage.component.html:8
+#: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html
+msgid "Quick access"
+msgstr "Acceso rápido"
+
 #: tabby-core/src/index.ts:219
 #: tabby-core/src/services/profiles.service.ts:295
 msgid "Quick connect"
@@ -1694,6 +1772,10 @@ msgstr "Reciente"
 #: tabby-terminal/src/tabContextMenu.ts:119
 msgid "Reconnect"
 msgstr "Reconectar"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Refresh"
+msgstr "Actualizar"
 
 #: tabby-terminal/src/hotkeys.ts:102
 msgid "Reconnect current tab (Serial/Telnet/SSH)"
@@ -1881,6 +1963,10 @@ msgstr "Desplaza el terminal hasta la parte inferior de la entrada del usuario"
 msgid "Search"
 msgstr "Buscar"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Search files"
+msgstr "Buscar archivos"
+
 #: tabby-terminal/src/components/colorSchemeSelector.component.ts:9
 #: tabby-terminal/src/components/colorSchemeSettingsForMode.component.ts:10
 msgid "Search color schemes"
@@ -1910,6 +1996,10 @@ msgstr "Seleccione un perfil base para usar como plantilla"
 #: tabby-terminal/src/hotkeys.ts:18
 msgid "Select all"
 msgstr "Seleccionar todo"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "selected"
+msgstr "seleccionados"
 
 #: tabby-core/src/services/fileProviders.service.ts:47
 msgid "Select file storage"
@@ -1996,6 +2086,10 @@ msgstr "Mostrar"
 msgid "Show {type} profile selector"
 msgstr "Mostrar {type} selector de perfil"
 
+#: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html
+msgid "Show a New connection button on the home screen"
+msgstr "Muestra un botón de Nueva conexión en la pantalla de inicio"
+
 #: locale/tmp-html/tabby-terminal/src/components/terminalSettingsTab.component.html:117
 msgid "Show a confirmation box when pasting multiple lines"
 msgstr "Mostrar un cuadro de confirmación al pegar múltiples líneas"
@@ -2048,9 +2142,81 @@ msgstr "Mostrar conexiones Serial"
 msgid "Show tabs in fullscreen mode"
 msgstr "Mostrar pestañas en modo de pantalla completa"
 
+#: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html
+msgid "Show the last 5 connections as cards on the home screen"
+msgstr "Muestra las últimas 5 conexiones en tarjetas en la pantalla de inicio"
+
 #: tabby-terminal/src/tabContextMenu.ts:62
 msgid "Show toolbar"
 msgstr "Mostrar barra de herramientas"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Show hidden files"
+msgstr "Mostrar archivos ocultos"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Show download button on hover"
+msgstr "Mostrar botón de descarga al pasar el ratón"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Display a download icon on each file"
+msgstr "Muestra un icono de descarga en cada archivo"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Show dotfiles like .bashrc when SFTP opens"
+msgstr "Muestra archivos como .bashrc al abrir SFTP"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Preferred view"
+msgstr "Vista preferida"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Default layout when you open SFTP"
+msgstr "Diseño predeterminado al abrir SFTP"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Choose how the file manager looks and how you open, select and upload files."
+msgstr "Elige cómo se ve el explorador y cómo abres, seleccionas y subes archivos."
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Interaction"
+msgstr "Interacción"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Open with"
+msgstr "Abrir con"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "How folders and files open in the SFTP panel"
+msgstr "Cómo se abren carpetas y archivos en el panel SFTP"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Double-click"
+msgstr "Doble clic"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Single-click"
+msgstr "Un clic"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Multi-select"
+msgstr "Selección múltiple"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Use Ctrl or Shift plus click to select several items"
+msgstr "Usa Ctrl o Mayús y clic para seleccionar varios elementos"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Transfers"
+msgstr "Transferencias"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Drag and drop uploads"
+msgstr "Subir arrastrando archivos"
+
+#: tabby-ssh/src/components/sftpSettingsTab.component.pug
+msgid "Drop files from your computer into the current folder"
+msgstr "Suelta archivos del equipo en la carpeta actual"
 
 #: locale/tmp-html/tabby-settings/src/components/vaultSettingsTab.component.html:45
 msgid "Show vault contents"
@@ -2059,6 +2225,10 @@ msgstr "Mostrar contenido de vault"
 #: locale/tmp-html/tabby-terminal/src/components/terminalSettingsTab.component.html:29
 msgid "Sixel graphics support (experimental)"
 msgstr "Soporte gráfico Sixel (experimental)"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Size"
+msgstr "Tamaño"
 
 #: locale/tmp-html/tabby-ssh/src/components/sshProfileSettings.component.html:140
 msgid "Skip MoTD/banner"
@@ -2129,6 +2299,10 @@ msgstr "Dividir en la parte superior"
 msgid "Split to the up"
 msgstr "Dividir hacia arriba"
 
+#: tabby-ssh/src/settings.ts
+msgid "SFTP"
+msgstr "SFTP"
+
 #: tabby-ssh/src/profiles.ts:82
 msgid "SSH connection"
 msgstr "Conexión SSH"
@@ -2136,6 +2310,10 @@ msgstr "Conexión SSH"
 #: locale/tmp-html/tabby-ssh/src/components/sshSettingsTab.component.html:47
 msgid "SSH connection management is now done through the \"Profiles & connections\" tab"
 msgstr "La gestión de conexiones SSH ahora se realiza a través de la pestaña \"Perfiles y conexiones\""
+
+#: tabby-ssh/src/components/sshSettingsTab.component.pug
+msgid "File manager options are in the SFTP settings tab"
+msgstr "Las opciones del explorador de archivos están en la pestaña SFTP"
 
 #: tabby-settings/src/components/vaultSettingsTab.component.ts:89
 msgid "SSH password for {user}@{host}:{port}"
@@ -2290,6 +2468,10 @@ msgstr "Hay transferencias de archivos activas"
 msgid "There is a saved password for this connection"
 msgstr "Hay una contraseña guardada para esta conexión"
 
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "This folder is empty"
+msgstr "Esta carpeta está vacía"
+
 #: locale/tmp-html/tabby-settings/src/components/profilesSettingsTab.component.html:102
 msgid "These apply to all profiles of a given type"
 msgstr "Estos se aplican a todos los perfiles de un tipo determinado"
@@ -2381,6 +2563,14 @@ msgstr "Actualizar a {version}"
 #: locale/tmp-html/tabby-ssh/src/components/sftpPanel.component.html:10
 msgid "Upload"
 msgstr "Cargar"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Upload files"
+msgstr "Subir archivos"
+
+#: tabby-ssh/src/components/sftpPanel.component.pug
+msgid "Upload folder"
+msgstr "Subir carpeta"
 
 #: locale/tmp-html/tabby-settings/src/components/configSyncSettingsTab.component.html:46
 msgid "Upload as a new config"

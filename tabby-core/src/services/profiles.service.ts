@@ -14,6 +14,8 @@ import slugify from 'slugify'
 
 @Injectable({ providedIn: 'root' })
 export class ProfilesService {
+    static readonly QUICK_ACCESS_LIMIT = 5
+
     private profileDefaults = {
         id: '',
         type: '',
@@ -130,6 +132,7 @@ export class ProfilesService {
     async deleteProfile (profile: PartialProfile<Profile>): Promise<void> {
         this.providerForProfile(profile)?.deleteProfile(this.getConfigProxyForProfile(profile))
         this.config.store.profiles = this.config.store.profiles.filter(p => p.id !== profile.id)
+        this.pruneRecentProfiles()
 
         const profileHotkeyName = ProfilesService.getProfileHotkeyName(profile)
         if (this.config.store.hotkeys.profile.hasOwnProperty(profileHotkeyName)) {
@@ -158,6 +161,7 @@ export class ProfilesService {
         }
 
         this.config.store.profiles = this.config.store.profiles.filter(x => !filter(x))
+        this.pruneRecentProfiles()
     }
 
     async openNewTabForProfile <P extends Profile> (profile: PartialProfile<P>): Promise<BaseTabComponent|null> {
@@ -191,10 +195,14 @@ export class ProfilesService {
         await this.openNewTabForProfile(profile)
 
         let recentProfiles: PartialProfile<Profile>[] = JSON.parse(window.localStorage['recentProfiles'] ?? '[]')
-        if (this.config.store.terminal.showRecentProfiles > 0) {
+        const limit = Math.max(
+            this.config.store.terminal.showRecentProfiles ?? 0,
+            this.config.store.showQuickAccess ? ProfilesService.QUICK_ACCESS_LIMIT : 0,
+        )
+        if (limit > 0) {
             recentProfiles = recentProfiles.filter(x => x.group !== profile.group || x.name !== profile.name)
             recentProfiles.unshift(profile)
-            recentProfiles = recentProfiles.slice(0, this.config.store.terminal.showRecentProfiles)
+            recentProfiles = recentProfiles.slice(0, limit)
         } else {
             recentProfiles = []
         }
@@ -345,9 +353,38 @@ export class ProfilesService {
     }
 
     getRecentProfiles (): PartialProfile<Profile>[] {
+        return this.pruneRecentProfiles().slice(0, this.config.store.terminal.showRecentProfiles)
+    }
+
+    getQuickAccessProfiles (): PartialProfile<Profile>[] {
+        return this.pruneRecentProfiles().slice(0, ProfilesService.QUICK_ACCESS_LIMIT)
+    }
+
+    pruneRecentProfiles (): PartialProfile<Profile>[] {
         let recentProfiles: PartialProfile<Profile>[] = JSON.parse(window.localStorage['recentProfiles'] ?? '[]')
-        recentProfiles = recentProfiles.slice(0, this.config.store.terminal.showRecentProfiles)
-        return recentProfiles
+        const knownIds = new Set((this.config.store.profiles ?? []).map(p => p.id).filter(Boolean))
+        const blacklist = new Set(this.config.store.profileBlacklist ?? [])
+
+        const filtered = recentProfiles.filter(profile => {
+            if (profile.id && blacklist.has(profile.id)) {
+                return false
+            }
+            if (profile.isBuiltin) {
+                return true
+            }
+            if (profile.id) {
+                return knownIds.has(profile.id)
+            }
+            return true
+        }).map(profile => {
+            if (!profile.id) {
+                return profile
+            }
+            return (this.config.store.profiles ?? []).find(p => p.id === profile.id) ?? profile
+        })
+
+        window.localStorage['recentProfiles'] = JSON.stringify(filtered)
+        return filtered
     }
 
     async quickConnect (query: string): Promise<PartialProfile<Profile>|null> {

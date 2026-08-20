@@ -1,16 +1,42 @@
 
-.mt-auto.mb-auto
+.mt-auto.mb-auto.start-page-body
     .tabby-logo
     h1.tabby-title Tabby
         sup α
 
-    .list-group.mb-4
-        a.list-group-item.list-group-item-action.d-flex.pt-3.pb-3(
-            *ngFor='let command of commands; trackBy: buttonsTrackBy',
-            (click)='command.run()',
+    .quick-access(*ngIf='config.store.showQuickAccess')
+        h2.quick-access-title(translate) Quick access
+        .quick-access-cards(*ngIf='recentProfiles.length')
+            button.quick-access-card(
+                type='button',
+                *ngFor='let profile of recentProfiles; trackBy: profilesTrackBy',
+                (click)='launchProfile(profile)',
+            )
+                profile-icon.quick-access-icon(
+                    [icon]='profile.icon || "fas fa-history"',
+                    [color]='profile.color'
+                )
+                .quick-access-name {{profile.name}}
+                .quick-access-desc.text-muted(*ngIf='getDescription(profile)') {{getDescription(profile)}}
+                .quick-access-type {{getTypeLabel(profile)}}
+        .quick-access-empty.text-muted(*ngIf='!recentProfiles.length', translate) No recent connections
+
+    .start-page-actions.mb-4
+        button.btn.btn-primary.btn-new-connection(
+            type='button',
+            *ngIf='config.store.showNewConnectionButton && newConnectionCommand',
+            (click)='createNewConnection()',
         )
-            .d-flex.align-self-center([innerHTML]='sanitizeIcon(command.icon)')
-            span {{command.label}}
+            i.fas.fa-plus.me-2
+            span(translate) New connection
+
+        .list-group
+            a.list-group-item.list-group-item-action.d-flex.pt-3.pb-3(
+                *ngFor='let command of commands; trackBy: buttonsTrackBy',
+                (click)='command.run()',
+            )
+                .d-flex.align-self-center([innerHTML]='sanitizeIcon(command.icon)')
+                span {{command.label}}
 
 footer.d-flex.align-items-center
     .btn-group.me-auto

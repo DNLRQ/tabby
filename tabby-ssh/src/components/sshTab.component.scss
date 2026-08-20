@@ -1,7 +1,21 @@
 sftp-panel {
     position: absolute;
-    height: 80%;
+    height: 88%;
     width: 100%;
     bottom: 0;
     z-index: 5;
+    border-radius: 18px 18px 0 0;
+    overflow: hidden;
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--theme-bg-more-2);
+}
+
+.sftp-open-btn {
+    border-radius: 8px;
+    color: #f5c14a !important;
+    background: rgba(245, 193, 74, 0.12);
+
+    &:hover {
+        background: rgba(245, 193, 74, 0.22) !important;
+    }
 }

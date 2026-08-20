@@ -1,0 +1,8 @@
+sftp-panel(
+    *ngIf='sshSession',
+    [session]='sshSession',
+    [standalone]='true',
+    [(path)]='path',
+    (closed)='onClosed()',
+    (newWindow)='openAnotherWindow()'
+)

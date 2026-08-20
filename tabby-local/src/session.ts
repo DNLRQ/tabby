@@ -175,21 +175,37 @@ export class Session extends BaseSession {
     async gracefullyKillProcess (): Promise<void> {
         if (this.hostApp.platform === Platform.Windows) {
             this.kill()
-        } else {
-            await new Promise<void>((resolve) => {
-                this.kill('SIGTERM')
-                setTimeout(async () => {
-                    try {
-                        process.kill(await this.pty!.getPID(), 0)
-                        // still alive
+            return
+        }
+
+        let pid: number|null = null
+        try {
+            pid = await this.pty!.getPID()
+        } catch {
+            this.kill('SIGKILL')
+            return
+        }
+
+        this.kill('SIGTERM')
+        const deadline = Date.now() + 500
+        await new Promise<void>((resolve) => {
+            const check = () => {
+                try {
+                    if (pid) {
+                        process.kill(pid, 0)
+                    }
+                    if (Date.now() >= deadline) {
                         this.kill('SIGKILL')
                         resolve()
-                    } catch {
-                        resolve()
+                        return
                     }
-                }, 500)
-            })
-        }
+                    setTimeout(check, 50)
+                } catch {
+                    resolve()
+                }
+            }
+            check()
+        })
     }
 
     supportsWorkingDirectory (): boolean {

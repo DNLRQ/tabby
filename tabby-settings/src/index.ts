@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms'
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 import { InfiniteScrollModule } from 'ngx-infinite-scroll'
 
-import TabbyCorePlugin, { ToolbarButtonProvider, HotkeyProvider, ConfigProvider, HotkeysService, AppService } from 'tabby-core'
+import TabbyCorePlugin, { ToolbarButtonProvider, HotkeyProvider, ConfigProvider, HotkeysService, AppService, CommandProvider } from 'tabby-core'
 
 import { EditProfileModalComponent } from './components/editProfileModal.component'
 import { EditProfileGroupModalComponent } from './components/editProfileGroupModal.component'
@@ -27,6 +27,7 @@ import { SettingsTabProvider } from './api'
 import { ButtonProvider } from './buttonProvider'
 import { SettingsHotkeyProvider } from './hotkeys'
 import { SettingsConfigProvider } from './config'
+import { SettingsCommandProvider } from './commands'
 import { HotkeySettingsTabProvider, WindowSettingsTabProvider, VaultSettingsTabProvider, ProfilesSettingsTabProvider, ConfigSyncSettingsTabProvider } from './settings'
 
 /** @hidden */
@@ -42,6 +43,7 @@ import { HotkeySettingsTabProvider, WindowSettingsTabProvider, VaultSettingsTabP
         { provide: ToolbarButtonProvider, useClass: ButtonProvider, multi: true },
         { provide: ConfigProvider, useClass: SettingsConfigProvider, multi: true },
         { provide: HotkeyProvider, useClass: SettingsHotkeyProvider, multi: true },
+        { provide: CommandProvider, useClass: SettingsCommandProvider, multi: true },
         { provide: SettingsTabProvider, useClass: HotkeySettingsTabProvider, multi: true },
         { provide: SettingsTabProvider, useClass: WindowSettingsTabProvider, multi: true },
         { provide: SettingsTabProvider, useClass: VaultSettingsTabProvider, multi: true },

@@ -12,6 +12,7 @@ import { SSHProfileSettingsComponent } from './components/sshProfileSettings.com
 import { SSHPortForwardingModalComponent } from './components/sshPortForwardingModal.component'
 import { SSHPortForwardingConfigComponent } from './components/sshPortForwardingConfig.component'
 import { SSHSettingsTabComponent } from './components/sshSettingsTab.component'
+import { SFTPSettingsTabComponent } from './components/sftpSettingsTab.component'
 import { SSHTabComponent } from './components/sshTab.component'
 import { SFTPPanelComponent } from './components/sftpPanel.component'
 import { SFTPDeleteModalComponent } from './components/sftpDeleteModal.component'
@@ -19,7 +20,7 @@ import { KeyboardInteractiveAuthComponent } from './components/keyboardInteracti
 import { HostKeyPromptModalComponent } from './components/hostKeyPromptModal.component'
 
 import { SSHConfigProvider } from './config'
-import { SSHSettingsTabProvider } from './settings'
+import { SSHSettingsTabProvider, SFTPSettingsTabProvider } from './settings'
 import { RecoveryProvider } from './recoveryProvider'
 import { SSHHotkeyProvider } from './hotkeys'
 import { SFTPContextMenu } from './tabContextMenu'
@@ -27,6 +28,7 @@ import { SSHProfilesService } from './profiles'
 import { SFTPContextMenuItemProvider } from './api/contextMenu'
 import { CommonSFTPContextMenu } from './sftpContextMenu'
 import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirectoryModal.component'
+import { SFTPTabComponent } from './components/sftpTab.component'
 
 /** @hidden */
 @NgModule({
@@ -42,6 +44,7 @@ import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirect
     providers: [
         { provide: ConfigProvider, useClass: SSHConfigProvider, multi: true },
         { provide: SettingsTabProvider, useClass: SSHSettingsTabProvider, multi: true },
+        { provide: SettingsTabProvider, useClass: SFTPSettingsTabProvider, multi: true },
         { provide: TabRecoveryProvider, useClass: RecoveryProvider, multi: true },
         { provide: HotkeyProvider, useClass: SSHHotkeyProvider, multi: true },
         { provide: TabContextMenuItemProvider, useClass: SFTPContextMenu, multi: true },
@@ -55,8 +58,10 @@ import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirect
         SSHPortForwardingModalComponent,
         SSHPortForwardingConfigComponent,
         SSHSettingsTabComponent,
+        SFTPSettingsTabComponent,
         SSHTabComponent,
         SFTPPanelComponent,
+        SFTPTabComponent,
         KeyboardInteractiveAuthComponent,
         HostKeyPromptModalComponent,
     ],

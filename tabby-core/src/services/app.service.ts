@@ -418,12 +418,27 @@ export class AppService {
         if (checkCanClose && !await tab.canClose()) {
             return
         }
-        const token = await this.tabRecovery.getFullRecoveryToken(tab, { includeState: true })
-        if (token) {
-            this.closedTabsStack.push(token)
-            this.closedTabsStack = this.closedTabsStack.slice(-5)
-        }
-        tab.destroy()
+
+        // Take the tab off the header immediately so close feels instant.
+        // Keep the component alive (unsortedTabs) until we serialize the buffer.
+        this.removeTab(tab)
+
+        await new Promise<void>(resolve => {
+            setTimeout(() => {
+                void (async () => {
+                    try {
+                        const token = await this.tabRecovery.getFullRecoveryToken(tab, { includeState: true })
+                        if (token) {
+                            this.closedTabsStack.push(token)
+                            this.closedTabsStack = this.closedTabsStack.slice(-5)
+                        }
+                    } finally {
+                        tab.destroy()
+                        resolve()
+                    }
+                })()
+            }, 0)
+        })
     }
 
     async duplicateTab (tab: BaseTabComponent): Promise<BaseTabComponent|null> {
@@ -472,12 +487,43 @@ export class AppService {
     }
 
     async closeWindow (): Promise<void> {
-        this.tabRecovery.enabled = false
+        for (const tab of this.tabs) {
+            if (!await tab.canClose()) {
+                return
+            }
+        }
+        for (const tab of this.tabs) {
+            tab.onBeforeAppQuit()
+            if (tab instanceof SplitTabComponent) {
+                for (const child of tab.getAllTabs()) {
+                    child.onBeforeAppQuit()
+                }
+            }
+        }
+        this.dismissUnrecoverableTabs()
         await this.tabRecovery.saveTabs(this.tabs)
-        if (await this.closeAllTabs()) {
-            this.hostWindow.close()
-        } else {
-            this.tabRecovery.enabled = true
+        this.tabRecovery.enabled = false
+        for (const tab of [...this.tabs]) {
+            tab.destroy(true)
+        }
+        this.hostWindow.close()
+    }
+
+    private dismissUnrecoverableTabs (): void {
+        const toClose: BaseTabComponent[] = []
+        for (const tab of this.tabs) {
+            if (tab.skipRecovery) {
+                toClose.push(tab)
+            } else if (tab instanceof SplitTabComponent) {
+                for (const child of tab.getAllTabs()) {
+                    if (child.skipRecovery) {
+                        toClose.push(child)
+                    }
+                }
+            }
+        }
+        for (const tab of toClose) {
+            tab.destroy()
         }
     }
 
