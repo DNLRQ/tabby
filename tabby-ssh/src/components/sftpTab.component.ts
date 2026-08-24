@@ -34,12 +34,24 @@ export class SFTPTabComponent extends BaseTabComponent {
             return
         }
         this.sshSession.ref()
-        const host = this.profile?.options
-        this.setTitle(host?.host ? `SFTP · ${host.user}@${host.host}` : 'SFTP')
+        this.setTitle(this.sftpTabTitle())
         this.subscribeUntilDestroyed(this.sshSession.willDestroy$, () => {
             this.sessionReleased = true
             this.destroy()
         })
+    }
+
+    private sftpTabTitle (): string {
+        const profile = this.profile ?? this.sshSession?.profile
+        const name = profile?.name?.trim()
+        if (name) {
+            return `SFTP · ${name}`
+        }
+        const host = profile?.options
+        if (host?.host) {
+            return `SFTP · ${host.user ? `${host.user}@${host.host}` : host.host}`
+        }
+        return 'SFTP'
     }
 
     ngOnDestroy (): void {

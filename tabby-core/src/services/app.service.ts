@@ -238,7 +238,7 @@ export class AppService {
             this._activeTab?.emitFocused()
             this._activeTab?.emitVisibility(true)
         })
-        this.hostWindow.setTitle(this._activeTab?.title)
+        this.hostWindow.setTitle(this._activeTab?.title ?? 'Tabby')
     }
 
     getParentTab (tab: BaseTabComponent): SplitTabComponent|null {

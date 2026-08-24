@@ -4,6 +4,7 @@ import type { SFTPPanelComponent } from '../components/sftpPanel.component'
 export interface SFTPConnectionRef {
     id: number
     label: string
+    host: string
     path: string
     panel: SFTPPanelComponent
 }
@@ -31,8 +32,9 @@ export class SFTPConnectionRegistry {
             .filter(panel => panel !== except && panel.sftp)
             .map(panel => ({
                 id: this.ids.get(panel) ?? 0,
-                label: panel.hostLabel || 'SFTP',
-                path: panel.path,
+                label: panel.connectionName,
+                host: panel.hostLabel,
+                path: panel.path || '/',
                 panel,
             }))
     }

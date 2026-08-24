@@ -295,6 +295,13 @@ export class AppRootComponent {
         this.app.selectTab(tab)
     }
 
+    onToolbarButton (button: Command): void {
+        if (button.id === 'core:home') {
+            this.transfersUI.closeFullScreen()
+        }
+        button.run?.()
+    }
+
     @HostBinding('class.vibrant') get isVibrant () {
         return this.config.store?.appearance.vibrancy
     }

@@ -6,6 +6,7 @@ import { SFTPConnectionRef } from '../services/sftpConnections.service'
 /** @hidden */
 @Component({
     templateUrl: './sftpSendToModal.component.pug',
+    styleUrls: ['./sftpSendToModal.component.scss'],
 })
 export class SFTPSendToModalComponent extends BaseComponent {
     @Input() targets: SFTPConnectionRef[] = []
@@ -19,6 +20,13 @@ export class SFTPSendToModalComponent extends BaseComponent {
 
     ngOnInit (): void {
         this.selected = this.targets[0] ?? null
+    }
+
+    hostFor (target: SFTPConnectionRef): string {
+        if (!target.host || target.host === target.label) {
+            return ''
+        }
+        return target.host
     }
 
     confirm (): void {

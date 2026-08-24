@@ -2146,6 +2146,54 @@ msgstr "Mostrar pestañas en modo de pantalla completa"
 msgid "Show the last 5 connections as cards on the home screen"
 msgstr "Muestra las últimas 5 conexiones en tarjetas en la pantalla de inicio"
 
+msgid "Connection groups"
+msgstr "Grupos de conexiones"
+
+msgid "Connections"
+msgstr "Conexiones"
+
+msgid "SSH"
+msgstr "SSH"
+
+msgid "Telnet"
+msgstr "Telnet"
+
+msgid "RDP"
+msgstr "RDP"
+
+msgid "Home"
+msgstr "Inicio"
+
+msgid "Last used"
+msgstr "Último uso"
+
+msgid "Connected"
+msgstr "Conectada"
+
+msgid "Idle"
+msgstr "Inactiva"
+
+msgid "Never"
+msgstr "Nunca"
+
+msgid "Just now"
+msgstr "Ahora"
+
+msgid "Yesterday"
+msgstr "Ayer"
+
+msgid "{count} min ago"
+msgstr "hace {count} min"
+
+msgid "{count} h ago"
+msgstr "hace {count} h"
+
+msgid "{count} d ago"
+msgstr "hace {count} d"
+
+msgid "Show all connections grouped as cards on the home screen"
+msgstr "Muestra todas las conexiones agrupadas en tarjetas en la pantalla de inicio"
+
 #: tabby-terminal/src/tabContextMenu.ts:62
 msgid "Show toolbar"
 msgstr "Mostrar barra de herramientas"
@@ -2203,8 +2251,8 @@ msgid "Multi-select"
 msgstr "Selección múltiple"
 
 #: tabby-ssh/src/components/sftpSettingsTab.component.pug
-msgid "Use Ctrl or Shift plus click to select several items"
-msgstr "Usa Ctrl o Mayús y clic para seleccionar varios elementos"
+msgid "Use Ctrl or Shift plus click, drag a selection box, or Ctrl+A to select several items"
+msgstr "Usa Ctrl o Mayús y clic, arrastra un recuadro o pulsa Ctrl+A para seleccionar varios elementos"
 
 #: tabby-ssh/src/components/sftpSettingsTab.component.pug
 msgid "Transfers"
@@ -3061,6 +3109,9 @@ msgstr "Abre primero otra conexión SFTP"
 
 msgid "Choose the SFTP connection and the current folder that will receive the files."
 msgstr "Elige la conexión SFTP y la carpeta actual que recibirá los archivos."
+
+msgid "Current folder"
+msgstr "Carpeta actual"
 
 msgid "Send"
 msgstr "Enviar"

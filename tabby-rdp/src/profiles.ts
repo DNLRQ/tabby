@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core'
 import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider } from 'tabby-core'
+import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { RDPProfileSettingsComponent } from './components/rdpProfileSettings.component'
 import { RDPTabComponent } from './components/rdpTab.component'
 import { PasswordStorageService } from './services/passwordStorage.service'
@@ -8,7 +9,7 @@ import { RDPProfile } from './api'
 @Injectable({ providedIn: 'root' })
 export class RDPProfilesService extends QuickConnectProfileProvider<RDPProfile> {
     id = 'rdp'
-    name = 'RDP'
+    name = _('RDP')
     settingsComponent = RDPProfileSettingsComponent
     configDefaults = {
         options: {

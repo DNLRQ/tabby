@@ -126,12 +126,16 @@
             span.sftp-progress-speed(*ngIf='transferSpeed') {{transferSpeed|filesize}}/s
 
     .sftp-body(
+        tabindex='-1',
+        [class.is-marquee]='!!marqueeBox',
         (click)='onBackgroundClick($event)',
+        (mousedown)='onMarqueeMouseDown($event)',
         (dragenter)='onDragEnter($event)',
         (dragover)='onDragOver($event)',
         (dragleave)='onDragLeave($event)',
         (drop)='onDrop($event)'
     )
+        .sftp-marquee(*ngIf='marqueeBox', [ngStyle]='marqueeStyle')
         .sftp-drop-overlay(*ngIf='isDragging && sftpConfig.dragAndDrop && !isInternalDrag')
             .sftp-drop-overlay-inner
                 i.fas.fa-cloud-upload-alt
@@ -180,6 +184,7 @@
                 button.sftp-card(
                     *ngFor='let item of filteredFileList; trackBy: trackByPath',
                     type='button',
+                    [attr.data-sftp-path]='item.fullPath',
                     [class.is-dir]='item.isDirectory',
                     [class.selected]='isSelected(item)',
                     draggable='true',
@@ -235,6 +240,7 @@
                 button.sftp-row(
                     *ngFor='let item of filteredFileList; trackBy: trackByPath',
                     type='button',
+                    [attr.data-sftp-path]='item.fullPath',
                     [class.is-dir]='item.isDirectory',
                     [class.selected]='isSelected(item)',
                     draggable='true',

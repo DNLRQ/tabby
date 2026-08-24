@@ -54,7 +54,8 @@ title-bar(
                 )
                     button.btn.btn-secondary.btn-tab-bar(
                         [ngbTooltip]='button.label',
-                        (click)='button.run && button.run()',
+                        [class.active]='button.id === "core:home" && !app.activeTab',
+                        (click)='onToolbarButton(button)',
                         [fastHtmlBind]='button.icon'
                     )
 
@@ -118,7 +119,10 @@ title-bar(
                 *ngIf='config.store.appearance.frame == "thin" && (hostApp.platform == Platform.Windows) && (config.store.appearance.tabsLocation == "top")',
             )
         .content
-            start-page.content-tab.content-tab-active(*ngIf='ready && app.tabs.length == 0')
+            start-page.content-tab(
+                *ngIf='ready',
+                [class.content-tab-active]='!app.activeTab'
+            )
 
             tab-body.content-tab(
                 #tabBodies,

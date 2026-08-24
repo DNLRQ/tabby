@@ -71,6 +71,15 @@
 
                     .form-line
                         .header
+                            .title(translate) Connection groups
+                            .description(translate) Show all connections grouped as cards on the home screen
+                        toggle(
+                            [(ngModel)]='config.store.showGroupedConnections',
+                            (ngModelChange)='saveConfiguration()',
+                        )
+
+                    .form-line
+                        .header
                             .title(translate) New connection button
                             .description(translate) Show a New connection button on the home screen
                         toggle(

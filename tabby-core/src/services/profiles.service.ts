@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@angular/core'
 import { TranslateService } from '@ngx-translate/core'
+import { Subject } from 'rxjs'
 import { NewTabParameters } from './tabs.service'
 import { BaseTabComponent } from '../components/baseTab.component'
 import { QuickConnectProfileProvider, PartialProfile, PartialProfileGroup, Profile, ProfileGroup, ProfileProvider } from '../api/profileProvider'
@@ -15,6 +16,9 @@ import slugify from 'slugify'
 @Injectable({ providedIn: 'root' })
 export class ProfilesService {
     static readonly QUICK_ACCESS_LIMIT = 5
+    quickAccessChanged$ = new Subject<void>()
+
+    private seenProfileIds: Set<string> | null = null
 
     private profileDefaults = {
         id: '',
@@ -109,6 +113,7 @@ export class ProfilesService {
         }
 
         this.config.store.profiles.push(profile)
+        this.addToRecentProfiles(profile)
     }
 
     /**
@@ -193,20 +198,48 @@ export class ProfilesService {
 
     async launchProfile (profile: PartialProfile<Profile>): Promise<void> {
         await this.openNewTabForProfile(profile)
+        this.addToRecentProfiles(profile)
+    }
 
+    addToRecentProfiles (profile: PartialProfile<Profile>): void {
+        const limit = this.getRecentListLimit()
         let recentProfiles: PartialProfile<Profile>[] = JSON.parse(window.localStorage['recentProfiles'] ?? '[]')
-        const limit = Math.max(
-            this.config.store.terminal.showRecentProfiles ?? 0,
-            this.config.store.showQuickAccess ? ProfilesService.QUICK_ACCESS_LIMIT : 0,
-        )
         if (limit > 0) {
-            recentProfiles = recentProfiles.filter(x => x.group !== profile.group || x.name !== profile.name)
+            recentProfiles = recentProfiles.filter(x => !this.isSameRecentProfile(x, profile))
             recentProfiles.unshift(profile)
             recentProfiles = recentProfiles.slice(0, limit)
         } else {
             recentProfiles = []
         }
         window.localStorage['recentProfiles'] = JSON.stringify(recentProfiles)
+        this.recordProfileLastUsed(profile)
+        this.quickAccessChanged$.next()
+    }
+
+    getProfileLastUsed (profile: PartialProfile<Profile>): number | null {
+        if (!profile.id) {
+            return null
+        }
+        const ts = this.readLastUsedMap()[profile.id]
+        return typeof ts === 'number' ? ts : null
+    }
+
+    private recordProfileLastUsed (profile: PartialProfile<Profile>): void {
+        if (!profile.id) {
+            return
+        }
+        const map = this.readLastUsedMap()
+        map[profile.id] = Date.now()
+        window.localStorage['profileLastUsed'] = JSON.stringify(map)
+    }
+
+    private readLastUsedMap (): Record<string, number> {
+        try {
+            const parsed = JSON.parse(window.localStorage['profileLastUsed'] ?? '{}')
+            return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+            return {}
+        }
     }
 
     static getProfileHotkeyName (profile: PartialProfile<Profile>): string {
@@ -365,7 +398,7 @@ export class ProfilesService {
         const knownIds = new Set((this.config.store.profiles ?? []).map(p => p.id).filter(Boolean))
         const blacklist = new Set(this.config.store.profileBlacklist ?? [])
 
-        const filtered = recentProfiles.filter(profile => {
+        let filtered = recentProfiles.filter(profile => {
             if (profile.id && blacklist.has(profile.id)) {
                 return false
             }
@@ -383,8 +416,57 @@ export class ProfilesService {
             return (this.config.store.profiles ?? []).find(p => p.id === profile.id) ?? profile
         })
 
+        const saved = this.getSavedUserProfiles()
+        const savedIds = new Set(saved.map(p => p.id!).filter(Boolean))
+        const limit = this.getRecentListLimit()
+
+        if (this.seenProfileIds && limit > 0) {
+            const added = saved.filter(p => p.id && !this.seenProfileIds!.has(p.id))
+            for (const profile of added) {
+                filtered = filtered.filter(x => !this.isSameRecentProfile(x, profile))
+                filtered.unshift(profile)
+            }
+            if (added.length) {
+                filtered = filtered.slice(0, limit)
+            }
+        }
+        this.seenProfileIds = savedIds
+
+        const fillLimit = this.config.store.showQuickAccess ? ProfilesService.QUICK_ACCESS_LIMIT : 0
+        if (fillLimit > 0 && filtered.length < fillLimit) {
+            const present = new Set(filtered.map(p => p.id).filter(Boolean) as string[])
+            for (let i = saved.length - 1; i >= 0 && filtered.length < fillLimit; i--) {
+                const profile = saved[i]
+                if (profile.id && !present.has(profile.id)) {
+                    filtered.push(profile)
+                    present.add(profile.id)
+                }
+            }
+        }
+
         window.localStorage['recentProfiles'] = JSON.stringify(filtered)
         return filtered
+    }
+
+    private getRecentListLimit (): number {
+        return Math.max(
+            this.config.store.terminal.showRecentProfiles ?? 0,
+            this.config.store.showQuickAccess ? ProfilesService.QUICK_ACCESS_LIMIT : 0,
+        )
+    }
+
+    private getSavedUserProfiles (): PartialProfile<Profile>[] {
+        const blacklist = new Set(this.config.store.profileBlacklist ?? [])
+        return (this.config.store.profiles ?? []).filter(p =>
+            !!p.id && !p.isBuiltin && !p.isTemplate && !blacklist.has(p.id!),
+        )
+    }
+
+    private isSameRecentProfile (a: PartialProfile<Profile>, b: PartialProfile<Profile>): boolean {
+        if (a.id && b.id) {
+            return a.id === b.id
+        }
+        return a.group === b.group && a.name === b.name
     }
 
     async quickConnect (query: string): Promise<PartialProfile<Profile>|null> {

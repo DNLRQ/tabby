@@ -3,15 +3,23 @@
 
 .modal-body
     p.text-muted(translate) Choose the SFTP connection and the current folder that will receive the files.
-    .list-group
-        button.list-group-item.list-group-item-action(
+    .send-to-list
+        button.send-to-item(
             type='button',
             *ngFor='let target of targets',
             [class.active]='selected === target',
             (click)='selected = target'
         )
-            .fw-bold {{target.label}}
-            .small.opacity-75 {{target.path}}
+            .send-to-item-main
+                i.fas.fa-server.send-to-item-icon
+                .send-to-item-text
+                    .send-to-name {{target.label}}
+                    .send-to-host(*ngIf='hostFor(target)') {{hostFor(target)}}
+            .send-to-path
+                span.send-to-path-label(translate) Current folder
+                span.send-to-path-value
+                    i.fas.fa-folder
+                    span {{target.path}}
 
 .modal-footer
     button.btn.btn-secondary((click)='cancel()', translate) Cancel

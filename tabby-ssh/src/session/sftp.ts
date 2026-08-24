@@ -166,7 +166,17 @@ export class SFTPSession {
             await this.stat(p)
             return true
         } catch {
-            return false
+            try {
+                const parent = posixPath.dirname(p)
+                const name = posixPath.basename(p)
+                if (!name) {
+                    return false
+                }
+                const entries = await this.readdir(parent)
+                return entries.some(entry => entry.name === name)
+            } catch {
+                return false
+            }
         }
     }
 

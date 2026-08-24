@@ -2572,3 +2572,60 @@ msgctxt "[Dynamic] port forwarding"
 msgid "id.port-forwarding.dynamic"
 msgstr "Dynamic"
 
+
+msgid "Connections"
+msgstr "Connections"
+
+msgid "Connection groups"
+msgstr "Connection groups"
+
+msgid "Home"
+msgstr "Home"
+
+msgid "Last used"
+msgstr "Last used"
+
+msgid "Connected"
+msgstr "Connected"
+
+msgid "Idle"
+msgstr "Idle"
+
+msgid "Never"
+msgstr "Never"
+
+msgid "Just now"
+msgstr "Just now"
+
+msgid "Yesterday"
+msgstr "Yesterday"
+
+msgid "{count} min ago"
+msgstr "{count} min ago"
+
+msgid "{count} h ago"
+msgstr "{count} h ago"
+
+msgid "{count} d ago"
+msgstr "{count} d ago"
+
+msgid "Show all connections grouped as cards on the home screen"
+msgstr "Show all connections grouped as cards on the home screen"
+
+msgid "SSH"
+msgstr "SSH"
+
+msgid "Telnet"
+msgstr "Telnet"
+
+msgid "RDP"
+msgstr "RDP"
+
+msgid "New connection button"
+msgstr "New connection button"
+
+msgid "Show a New connection button on the home screen"
+msgstr "Show a New connection button on the home screen"
+
+msgid "Show the last 5 connections as cards on the home screen"
+msgstr "Show the last 5 connections as cards on the home screen"

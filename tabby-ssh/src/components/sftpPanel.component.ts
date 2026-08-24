@@ -61,9 +61,15 @@ export class SFTPPanelComponent implements OnDestroy {
     isDragging = false
     dropTargetPath: string | null = null
     progressTick = 0
+    marqueeBox: { left: number, top: number, width: number, height: number } | null = null
     private dragDepth = 0
     private selected = new Set<string>()
     private anchorPath: string | null = null
+    private marqueeStart: { x: number, y: number, additive: boolean, snapshot: Set<string> } | null = null
+    private ignoreNextBackgroundClick = false
+    private onMarqueeMove = (event: MouseEvent) => this.updateMarquee(event)
+    private onMarqueeUp = (event: MouseEvent) => this.endMarquee(event)
+    private onKeydownCapture = (event: KeyboardEvent) => this.handleSelectAllShortcut(event)
     private configSub: Subscription | null = null
     private clipboard: { action: 'copy' | 'cut', items: SFTPFile[] } | null = null
     private conflictApplyAll: SFTPConflictChoice | null = null
@@ -113,6 +119,8 @@ export class SFTPPanelComponent implements OnDestroy {
         this.connections.unregister(this)
         this.configSub?.unsubscribe()
         this.stopProgressTimer()
+        this.teardownMarqueeListeners()
+        document.removeEventListener('keydown', this.onKeydownCapture, true)
     }
 
     private stopProgressTimer (): void {
@@ -131,6 +139,7 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     async ngOnInit (): Promise<void> {
+        document.addEventListener('keydown', this.onKeydownCapture, true)
         this.configSub = this.config.changed$.subscribe(() => this.applySftpSettings())
         this.sftp = await this.session.openSFTP()
         this.connections.register(this)
@@ -274,6 +283,7 @@ export class SFTPPanelComponent implements OnDestroy {
     onItemClick (item: SFTPFile, event: MouseEvent): void {
         event.preventDefault()
         event.stopPropagation()
+        this.focusFilePane()
 
         const multi = this.sftpConfig.multiSelect
         const ctrl = multi && (event.ctrlKey || event.metaKey)
@@ -307,9 +317,196 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     onBackgroundClick (event: MouseEvent): void {
-        if (event.target === event.currentTarget) {
-            this.clearSelection()
+        if (this.ignoreNextBackgroundClick) {
+            this.ignoreNextBackgroundClick = false
+            return
         }
+        const target = event.target as HTMLElement | null
+        if (target?.closest('.sftp-card, .sftp-row, .sftp-footer-action, button, a, input')) {
+            return
+        }
+        this.clearSelection()
+    }
+
+    onMarqueeMouseDown (event: MouseEvent): void {
+        if (event.button !== 0 || !this.sftpConfig.multiSelect || this.isDragging) {
+            return
+        }
+        const target = event.target as HTMLElement | null
+        if (target?.closest('.sftp-card, .sftp-row, button, a, input, .sftp-tip, .sftp-progress, .sftp-list-head')) {
+            return
+        }
+        const container = this.getFilePane()
+        if (!container) {
+            return
+        }
+        this.focusFilePane()
+        const point = this.eventToPanePoint(event, container)
+        this.marqueeStart = {
+            x: point.x,
+            y: point.y,
+            additive: event.ctrlKey || event.metaKey,
+            snapshot: new Set(this.selected),
+        }
+        document.addEventListener('mousemove', this.onMarqueeMove)
+        document.addEventListener('mouseup', this.onMarqueeUp)
+    }
+
+    get marqueeStyle (): Record<string, string> {
+        if (!this.marqueeBox) {
+            return {}
+        }
+        return {
+            left: `${this.marqueeBox.left}px`,
+            top: `${this.marqueeBox.top}px`,
+            width: `${this.marqueeBox.width}px`,
+            height: `${this.marqueeBox.height}px`,
+        }
+    }
+
+    private updateMarquee (event: MouseEvent): void {
+        if (!this.marqueeStart) {
+            return
+        }
+        const container = this.getFilePane()
+        if (!container) {
+            return
+        }
+        this.autoScrollPane(event, container)
+        const point = this.eventToPanePoint(event, container)
+        const width = Math.abs(point.x - this.marqueeStart.x)
+        const height = Math.abs(point.y - this.marqueeStart.y)
+        if (!this.marqueeBox && width < 4 && height < 4) {
+            return
+        }
+        event.preventDefault()
+        this.marqueeBox = {
+            left: Math.min(this.marqueeStart.x, point.x),
+            top: Math.min(this.marqueeStart.y, point.y),
+            width,
+            height,
+        }
+        this.applyMarqueeSelection(container)
+    }
+
+    private endMarquee (_event: MouseEvent): void {
+        if (this.marqueeBox) {
+            this.ignoreNextBackgroundClick = true
+        }
+        this.marqueeBox = null
+        this.marqueeStart = null
+        this.teardownMarqueeListeners()
+        document.body.style.removeProperty('user-select')
+    }
+
+    private applyMarqueeSelection (container: HTMLElement): void {
+        if (!this.marqueeBox || !this.marqueeStart) {
+            return
+        }
+        const box = this.marqueeBox
+        const paneRect = container.getBoundingClientRect()
+        const next = this.marqueeStart.additive ? new Set(this.marqueeStart.snapshot) : new Set<string>()
+        for (const el of Array.from(container.querySelectorAll('[data-sftp-path]'))) {
+            const itemRect = el.getBoundingClientRect()
+            const left = itemRect.left - paneRect.left + container.scrollLeft
+            const top = itemRect.top - paneRect.top + container.scrollTop
+            const intersects = !(
+                left + itemRect.width < box.left
+                || left > box.left + box.width
+                || top + itemRect.height < box.top
+                || top > box.top + box.height
+            )
+            const itemPath = el.getAttribute('data-sftp-path')
+            if (intersects && itemPath) {
+                next.add(itemPath)
+            }
+        }
+        if (!this.sameSelection(this.selected, next)) {
+            this.selected = next
+        }
+        document.body.style.userSelect = 'none'
+    }
+
+    private autoScrollPane (event: MouseEvent, container: HTMLElement): void {
+        const rect = container.getBoundingClientRect()
+        const edge = 28
+        if (event.clientY < rect.top + edge) {
+            container.scrollTop -= 18
+        } else if (event.clientY > rect.bottom - edge) {
+            container.scrollTop += 18
+        }
+        if (event.clientX < rect.left + edge) {
+            container.scrollLeft -= 18
+        } else if (event.clientX > rect.right - edge) {
+            container.scrollLeft += 18
+        }
+    }
+
+    private getFilePane (): HTMLElement | null {
+        return this.element.nativeElement.querySelector('.sftp-body')
+    }
+
+    private eventToPanePoint (event: MouseEvent, container: HTMLElement): { x: number, y: number } {
+        const rect = container.getBoundingClientRect()
+        return {
+            x: event.clientX - rect.left + container.scrollLeft,
+            y: event.clientY - rect.top + container.scrollTop,
+        }
+    }
+
+    private focusFilePane (): void {
+        this.getFilePane()?.focus({ preventScroll: true })
+    }
+
+    private teardownMarqueeListeners (): void {
+        document.removeEventListener('mousemove', this.onMarqueeMove)
+        document.removeEventListener('mouseup', this.onMarqueeUp)
+    }
+
+    private handleSelectAllShortcut (event: KeyboardEvent): void {
+        if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') {
+            return
+        }
+        if (this.selectAllVisible(event.target as HTMLElement | null)) {
+            event.preventDefault()
+            event.stopPropagation()
+        }
+    }
+
+    private selectAllVisible (target?: HTMLElement | null): boolean {
+        if (!this.sftpConfig.multiSelect || !this.filteredFileList.length || !this.isPanelVisible()) {
+            return false
+        }
+        if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.classList.contains('xterm-helper-textarea')) {
+            return false
+        }
+        this.selected = new Set(this.filteredFileList.map(item => item.fullPath))
+        this.anchorPath = this.filteredFileList[0]?.fullPath ?? null
+        return true
+    }
+
+    private isPanelVisible (): boolean {
+        const el = this.element.nativeElement
+        if (!el.isConnected) {
+            return false
+        }
+        const rect = el.getBoundingClientRect()
+        if (rect.width < 8 || rect.height < 8) {
+            return false
+        }
+        return rect.right > 0 && rect.left < window.innerWidth && rect.bottom > 0 && rect.top < window.innerHeight
+    }
+
+    private sameSelection (a: Set<string>, b: Set<string>): boolean {
+        if (a.size !== b.size) {
+            return false
+        }
+        for (const itemPath of a) {
+            if (!b.has(itemPath)) {
+                return false
+            }
+        }
+        return true
     }
 
     isSelected (item: SFTPFile): boolean {
@@ -557,10 +754,10 @@ export class SFTPPanelComponent implements OnDestroy {
             return
         }
 
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && this.sftpConfig.multiSelect && this.filteredFileList.length) {
-            event.preventDefault()
-            this.selected = new Set(this.filteredFileList.map(item => item.fullPath))
-            this.anchorPath = this.filteredFileList[0]?.fullPath ?? null
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+            if (this.selectAllVisible()) {
+                event.preventDefault()
+            }
             return
         }
 
@@ -942,6 +1139,14 @@ export class SFTPPanelComponent implements OnDestroy {
         return options.user ? `${options.user}@${options.host}` : options.host
     }
 
+    get connectionName (): string {
+        const name = this.session?.profile?.name?.trim()
+        if (name) {
+            return name
+        }
+        return this.hostLabel || 'SFTP'
+    }
+
     get folderCount (): number {
         return this.filteredFileList.filter(item => item.isDirectory).length
     }
@@ -1301,41 +1506,64 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     private async resolveConflict (destPath: string, name: string, session = this.sftp): Promise<string | 'skip'> {
-        if (!await session.exists(destPath)) {
-            return destPath
+        let nextPath = destPath
+        let nextName = name
+        while (await session.exists(nextPath)) {
+            const preset = this.conflictApplyAll
+            if (preset === 'overwrite') {
+                return nextPath
+            }
+            if (preset === 'skip') {
+                return 'skip'
+            }
+            if (preset === 'rename') {
+                return this.nextAvailablePath(session, nextPath)
+            }
+            const modal = this.ngbModal.open(SFTPConflictModalComponent, {
+                backdrop: 'static',
+                centered: true,
+            })
+            modal.componentInstance.path = nextPath
+            modal.componentInstance.name = nextName
+            const result: SFTPConflictResult | null = await modal.result.catch(() => null)
+            if (!result) {
+                return 'skip'
+            }
+            if (result.applyToAll) {
+                this.conflictApplyAll = result.choice
+            }
+            if (result.choice === 'skip') {
+                return 'skip'
+            }
+            if (result.choice === 'rename') {
+                nextName = result.newName || this.copyName(nextName)
+                nextPath = path.posix.join(path.posix.dirname(nextPath), nextName)
+                continue
+            }
+            return nextPath
         }
-        const preset = this.conflictApplyAll
-        if (preset === 'overwrite') {
-            return destPath
-        }
-        if (preset === 'skip') {
-            return 'skip'
-        }
-        const modal = this.ngbModal.open(SFTPConflictModalComponent)
-        modal.componentInstance.path = destPath
-        modal.componentInstance.name = name
-        const result: SFTPConflictResult | null = await modal.result.catch(() => null)
-        if (!result) {
-            return 'skip'
-        }
-        if (result.applyToAll) {
-            this.conflictApplyAll = result.choice
-        }
-        if (result.choice === 'skip') {
-            return 'skip'
-        }
-        if (result.choice === 'rename') {
-            return path.posix.join(path.posix.dirname(destPath), result.newName || this.copyName(name))
-        }
-        return destPath
+        return nextPath
     }
 
-    private copyName (name: string): string {
+    private async nextAvailablePath (session: SFTPSession, destPath: string): Promise<string> {
+        const dir = path.posix.dirname(destPath)
+        const name = path.posix.basename(destPath)
+        let index = 1
+        let candidate = path.posix.join(dir, this.copyName(name, index))
+        while (await session.exists(candidate)) {
+            index++
+            candidate = path.posix.join(dir, this.copyName(name, index))
+        }
+        return candidate
+    }
+
+    private copyName (name: string, index = 1): string {
+        const suffix = index === 1 ? ' (copy)' : ` (copy ${index})`
         const dot = name.lastIndexOf('.')
         if (dot > 0) {
-            return `${name.slice(0, dot)} (copy)${name.slice(dot)}`
+            return `${name.slice(0, dot)}${suffix}${name.slice(dot)}`
         }
-        return `${name} (copy)`
+        return `${name}${suffix}`
     }
 
     private async confirmRemoteUnchanged (item: SFTPFile, openedAt: number): Promise<boolean> {
@@ -1396,13 +1624,29 @@ export class SFTPPanelComponent implements OnDestroy {
     private async sendItemsTo (items: SFTPFile[], target: SFTPConnectionRef): Promise<void> {
         const destDir = target.path
         const dest = target.panel.sftp
-        let total = 0
+        this.conflictApplyAll = null
+        const jobs: { item: SFTPFile, destDir: string, destName: string }[] = []
         for (const item of items) {
-            total += await this.itemTotalSize(item)
+            const resolved = await this.resolveConflict(path.posix.join(destDir, item.name), item.name, dest)
+            if (resolved === 'skip') {
+                continue
+            }
+            jobs.push({
+                item,
+                destDir: path.posix.dirname(resolved),
+                destName: path.posix.basename(resolved),
+            })
         }
-        const name = items.length === 1
-            ? items[0].name
-            : this.translate.instant('{count} items', { count: items.length })
+        if (!jobs.length) {
+            return
+        }
+        let total = 0
+        for (const job of jobs) {
+            total += await this.itemTotalSize(job.item)
+        }
+        const name = jobs.length === 1
+            ? jobs[0].item.name
+            : this.translate.instant('{count} items', { count: jobs.length })
         const transfer = new RemoteCopyTransfer(name, total)
         transfer.setInfo({
             host: `${this.hostLabel} → ${target.label}`,
@@ -1412,14 +1656,13 @@ export class SFTPPanelComponent implements OnDestroy {
         this.platform.registerTransfer(transfer)
         this.trackTransfer(transfer)
         this.beginTransferBatch('copy', name, destDir, this.hostLabel, target.label)
-        this.conflictApplyAll = null
         try {
-            for (const item of items) {
+            for (const job of jobs) {
                 await transfer.waitIfPaused()
                 if (transfer.isCancelled()) {
                     throw new Error('Transfer cancelled')
                 }
-                await this.copyItemTo(item, dest, destDir, transfer)
+                await this.copyItemTo(job.item, dest, job.destDir, transfer, job.destName, true)
             }
             transfer.setCompleted(true)
             this.endTransferBatch()
@@ -1437,8 +1680,24 @@ export class SFTPPanelComponent implements OnDestroy {
         await target.panel.refreshIfHere(destDir)
     }
 
-    private async copyItemTo (item: SFTPFile, dest: SFTPSession, destDir: string, transfer: FileTransfer): Promise<void> {
-        const destPath = path.posix.join(destDir, item.name)
+    private async copyItemTo (
+        item: SFTPFile,
+        dest: SFTPSession,
+        destDir: string,
+        transfer: FileTransfer,
+        destName = item.name,
+        alreadyResolved = false,
+    ): Promise<void> {
+        let destPath = path.posix.join(destDir, destName)
+        if (!alreadyResolved) {
+            const resolved = await this.resolveConflict(destPath, destName, dest)
+            if (resolved === 'skip') {
+                transfer.reportProgress(item.isDirectory ? 0 : item.size)
+                this.recordTransfer('copy', item.name, destPath, 'cancelled', 0)
+                return
+            }
+            destPath = resolved
+        }
         if (item.isDirectory) {
             await dest.mkdir(destPath).catch(() => null)
             transfer.setStatus(item.name)
@@ -1451,18 +1710,12 @@ export class SFTPPanelComponent implements OnDestroy {
             }
             return
         }
-        const resolved = await this.resolveConflict(destPath, item.name, dest)
-        if (resolved === 'skip') {
-            transfer.reportProgress(item.size)
-            this.recordTransfer('copy', item.name, destPath, 'cancelled', 0)
-            return
-        }
         transfer.setStatus(item.name)
         try {
-            await this.sftp.copyTo(dest, item.fullPath, resolved, transfer)
-            this.recordTransfer('copy', item.name, resolved, 'success', item.size)
+            await this.sftp.copyTo(dest, item.fullPath, destPath, transfer)
+            this.recordTransfer('copy', item.name, destPath, 'success', item.size)
         } catch (error) {
-            this.recordTransfer('copy', item.name, resolved, transfer.isCancelled() ? 'cancelled' : 'error', item.size, error?.message)
+            this.recordTransfer('copy', item.name, destPath, transfer.isCancelled() ? 'cancelled' : 'error', item.size, error?.message)
             throw error
         }
     }

@@ -63,4 +63,5 @@ language: null
 defaultQuickConnectProvider: "ssh"
 showProfileTree: false
 showQuickAccess: true
+showGroupedConnections: true
 showNewConnectionButton: true
