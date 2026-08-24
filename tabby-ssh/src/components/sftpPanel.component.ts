@@ -14,7 +14,9 @@ import { SFTPConflictModalComponent, SFTPConflictChoice, SFTPConflictResult } fr
 import { SFTPPermissionsModalComponent } from './sftpPermissionsModal.component'
 import { SFTPEditorModalComponent } from './sftpEditorModal.component'
 import { SFTPTransferLogModalComponent } from './sftpTransferLogModal.component'
-import { SFTPTransfersService } from '../services/sftpTransfers.service'
+import { SFTPSendToModalComponent } from './sftpSendToModal.component'
+import { RemoteCopyTransfer, SFTPTransferDirection, SFTPTransferLogChild, SFTPTransferStatus, SFTPTransfersService } from '../services/sftpTransfers.service'
+import { SFTPConnectionRef, SFTPConnectionRegistry } from '../services/sftpConnections.service'
 
 interface PathSegment {
     name: string
@@ -32,6 +34,7 @@ interface SFTPUserConfig {
     editorPath: string
     editorMaxSizeMB: number
     transfersAutoShow: boolean
+    transfersPopup: boolean
 }
 
 @Component({
@@ -69,6 +72,16 @@ export class SFTPPanelComponent implements OnDestroy {
     private activeTransfers: FileTransfer[] = []
     private progressTimer: ReturnType<typeof setInterval> | null = null
     private progressHideAt = 0
+    private transferBatch: {
+        depth: number
+        direction: SFTPTransferDirection
+        name: string
+        remotePath: string
+        children: SFTPTransferLogChild[]
+        startedAt: number
+        sourceHost?: string
+        destHost?: string
+    } | null = null
 
     constructor (
         private ngbModal: NgbModal,
@@ -78,6 +91,7 @@ export class SFTPPanelComponent implements OnDestroy {
         public platform: PlatformService,
         private hostApp: HostAppService,
         private transferLog: SFTPTransfersService,
+        private connections: SFTPConnectionRegistry,
         private element: ElementRef<HTMLElement>,
         @Optional() @Inject(SFTPContextMenuItemProvider) protected contextMenuProviders: SFTPContextMenuItemProvider[],
     ) {
@@ -96,6 +110,7 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     ngOnDestroy (): void {
+        this.connections.unregister(this)
         this.configSub?.unsubscribe()
         this.stopProgressTimer()
     }
@@ -118,6 +133,7 @@ export class SFTPPanelComponent implements OnDestroy {
     async ngOnInit (): Promise<void> {
         this.configSub = this.config.changed$.subscribe(() => this.applySftpSettings())
         this.sftp = await this.session.openSFTP()
+        this.connections.register(this)
         let start = this.path
         if (!start || start === '/') {
             start = await this.resolveStartPath()
@@ -370,8 +386,16 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     async downloadSelected (): Promise<void> {
-        for (const item of this.selectedItems) {
-            await this.downloadItem(item)
+        const items = this.selectedItems
+        if (items.length > 1) {
+            this.beginTransferBatch('download', this.translate.instant('{count} items', { count: items.length }), this.path)
+        }
+        try {
+            for (const item of items) {
+                await this.downloadItem(item)
+            }
+        } finally {
+            this.endTransferBatch()
         }
     }
 
@@ -503,11 +527,12 @@ export class SFTPPanelComponent implements OnDestroy {
         if (!this.sftpConfig.dragAndDrop) {
             return
         }
+        const destDir = this.path
         const transfer = await this.platform.startUploadFromDragEvent(event, true)
         if (!transfer.getChildrens().length) {
             return
         }
-        await this.uploadOneFolder(transfer)
+        await this.uploadOneFolder(transfer, '', destDir)
     }
 
     private hasFiles (event: DragEvent): boolean {
@@ -610,45 +635,104 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     async upload (): Promise<void> {
+        const destDir = this.path
         this.conflictApplyAll = null
         const transfers = await this.platform.startUpload({ multiple: true })
+        if (transfers.length > 1) {
+            this.beginTransferBatch('upload', this.translate.instant('{count} files', { count: transfers.length }), destDir)
+        }
         for (const transfer of transfers) {
-            await this.uploadOne(transfer)
+            transfer.setInfo({ host: this.hostLabel, direction: 'upload', remotePath: destDir })
+        }
+        try {
+            for (const transfer of transfers) {
+                if (transfer.isCancelled()) {
+                    break
+                }
+                await this.uploadOne(transfer, undefined, destDir)
+            }
+        } catch (error) {
+            this.cancelPendingUploads(transfers, destDir)
+            throw error
+        } finally {
+            this.endTransferBatch()
         }
     }
 
     async uploadFolder (): Promise<void> {
+        const destDir = this.path
         const transfer = await this.platform.startUploadDirectory()
-        await this.uploadOneFolder(transfer)
+        await this.uploadOneFolder(transfer, '', destDir)
     }
 
-    async uploadOneFolder (transfer: DirectoryUpload, accumPath = ''): Promise<void> {
-        const savedPath = this.path
+    async uploadOneFolder (transfer: DirectoryUpload, accumPath = '', destDir = this.path): Promise<void> {
         if (!accumPath) {
             this.conflictApplyAll = null
+            this.beginFolderUploadBatch(transfer, destDir)
         }
-        for (const t of transfer.getChildrens()) {
-            if (t instanceof DirectoryUpload) {
-                try {
-                    await this.sftp.mkdir(path.posix.join(this.path, accumPath, t.getName()))
-                } catch {
-                    // Intentionally ignoring errors from making duplicate dirs.
+        try {
+            for (const t of transfer.getChildrens()) {
+                if (t instanceof DirectoryUpload) {
+                    try {
+                        await this.sftp.mkdir(path.posix.join(destDir, accumPath, t.getName()))
+                    } catch {
+                        // Intentionally ignoring errors from making duplicate dirs.
+                    }
+                    await this.uploadOneFolder(t, path.posix.join(accumPath, t.getName()), destDir)
+                } else {
+                    if (t.isCancelled()) {
+                        break
+                    }
+                    await this.uploadOne(t, path.posix.join(accumPath, t.getName()), destDir)
                 }
-                await this.uploadOneFolder(t, path.posix.join(accumPath, t.getName()))
-            } else {
-                await this.uploadOne(t, path.posix.join(accumPath, t.getName()))
+            }
+        } catch (error) {
+            if (!accumPath) {
+                this.cancelPendingUploads(transfer.getFiles(), destDir)
+            }
+            throw error
+        } finally {
+            if (!accumPath) {
+                this.endTransferBatch()
             }
         }
-        if (this.path === savedPath) {
+        if (this.path === destDir) {
             await this.navigate(this.path)
         }
     }
 
-    async uploadOne (transfer: FileUpload, relativeName?: string): Promise<void> {
-        const savedPath = this.path
-        const dest = path.posix.join(this.path, relativeName ?? transfer.getName())
+    private beginFolderUploadBatch (transfer: DirectoryUpload, destDir: string): void {
+        const files = transfer.getFiles()
+        if (!files.length) {
+            return
+        }
+        const roots = transfer.getChildrens()
+        if (roots.length === 1 && roots[0] instanceof DirectoryUpload) {
+            this.beginTransferBatch('upload', roots[0].getName(), path.posix.join(destDir, roots[0].getName()))
+            return
+        }
+        if (files.length > 1) {
+            this.beginTransferBatch('upload', this.translate.instant('{count} files', { count: files.length }), destDir)
+        }
+    }
+
+    private cancelPendingUploads (transfers: FileUpload[], destDir: string): void {
+        for (const transfer of transfers) {
+            if (!transfer.isComplete() && !transfer.isCancelled()) {
+                transfer.cancel()
+                this.recordTransfer('upload', transfer.getName(), path.posix.join(destDir, transfer.getName()), 'cancelled', transfer.getCompletedBytes())
+            }
+        }
+    }
+
+    async uploadOne (transfer: FileUpload, relativeName?: string, destDir = this.path): Promise<void> {
+        if (transfer.isCancelled()) {
+            return
+        }
+        const dest = path.posix.join(destDir, relativeName ?? transfer.getName())
         const resolved = await this.resolveConflict(dest, transfer.getName())
         if (resolved === 'skip') {
+            transfer.setCompleted(true)
             transfer.close()
             return
         }
@@ -659,7 +743,7 @@ export class SFTPPanelComponent implements OnDestroy {
             this.recordTransfer('upload', path.posix.basename(resolved), resolved, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), e.message)
             throw e
         }
-        if (this.path === savedPath) {
+        if (this.path === destDir) {
             await this.navigate(this.path)
         }
     }
@@ -670,11 +754,13 @@ export class SFTPPanelComponent implements OnDestroy {
             return
         }
         this.trackTransfer(transfer)
-        this.sftp.download(itemPath, transfer).then(() => {
+        transfer.setInfo({ host: this.hostLabel, direction: 'download', remotePath: itemPath })
+        try {
+            await this.sftp.download(itemPath, transfer)
             this.recordTransfer('download', path.basename(itemPath), itemPath, 'success', size)
-        }).catch(error => {
+        } catch (error) {
             this.recordTransfer('download', path.basename(itemPath), itemPath, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), error?.message)
-        })
+        }
     }
 
     async downloadFolder (folder: SFTPFile): Promise<void> {
@@ -685,6 +771,8 @@ export class SFTPPanelComponent implements OnDestroy {
             }
             transfer.pausable = true
             this.trackTransfer(transfer)
+            transfer.setInfo({ host: this.hostLabel, direction: 'download', remotePath: folder.fullPath })
+            this.beginTransferBatch('download', folder.name, folder.fullPath)
 
             try {
                 transfer.setStatus(this.translate.instant('Calculating size...'))
@@ -694,10 +782,14 @@ export class SFTPPanelComponent implements OnDestroy {
                 await this.downloadFolderRecursive(folder, transfer, '')
                 transfer.setStatus('')
                 transfer.setCompleted(true)
-                this.recordTransfer('download', folder.name, folder.fullPath, 'success', totalSize)
+                this.endTransferBatch()
             } catch (error) {
                 transfer.cancel()
-                this.recordTransfer('download', folder.name, folder.fullPath, transfer.isCancelled() ? 'cancelled' : 'error', transfer.getCompletedBytes(), error?.message)
+                this.endTransferBatch({
+                    status: transfer.isCancelled() ? 'cancelled' : 'error',
+                    bytes: transfer.getCompletedBytes(),
+                    error: error?.message,
+                })
                 throw error
             } finally {
                 transfer.close()
@@ -741,7 +833,13 @@ export class SFTPPanelComponent implements OnDestroy {
                 await this.downloadFolderRecursive(item, transfer, itemRelativePath)
             } else {
                 const fileDownload = await transfer.createFile(itemRelativePath, item.mode, item.size)
-                await this.sftp.download(item.fullPath, fileDownload, bytes => transfer.reportProgress(bytes))
+                try {
+                    await this.sftp.download(item.fullPath, fileDownload, bytes => transfer.reportProgress(bytes))
+                    this.recordTransfer('download', item.name, item.fullPath, 'success', item.size)
+                } catch (error) {
+                    this.recordTransfer('download', item.name, item.fullPath, fileDownload.isCancelled() || transfer.isCancelled() ? 'cancelled' : 'error', fileDownload.getCompletedBytes(), error?.message)
+                    throw error
+                }
             }
         }
     }
@@ -1037,7 +1135,8 @@ export class SFTPPanelComponent implements OnDestroy {
     }
 
     openTransferLog (): void {
-        this.ngbModal.open(SFTPTransferLogModalComponent, { size: 'lg' })
+        const modal = this.ngbModal.open(SFTPTransferLogModalComponent, { size: 'lg' })
+        modal.componentInstance.host = this.hostLabel
     }
 
     onItemDragStart (item: SFTPFile, event: DragEvent): void {
@@ -1201,8 +1300,8 @@ export class SFTPPanelComponent implements OnDestroy {
         return configured
     }
 
-    private async resolveConflict (destPath: string, name: string): Promise<string | 'skip'> {
-        if (!await this.sftp.exists(destPath)) {
+    private async resolveConflict (destPath: string, name: string, session = this.sftp): Promise<string | 'skip'> {
+        if (!await session.exists(destPath)) {
             return destPath
         }
         const preset = this.conflictApplyAll
@@ -1269,14 +1368,201 @@ export class SFTPPanelComponent implements OnDestroy {
         return ['txt', 'log', 'ini', 'conf', 'cfg', 'md', 'json', 'yml', 'yaml', 'xml', 'csv', 'html', 'css', 'js', 'ts', 'py', 'sh', 'rb', 'php', 'rs', 'go', 'c', 'h', 'cpp', 'java', 'sql', 'vue', 'tsx', 'jsx'].includes(ext)
     }
 
-    private recordTransfer (
-        direction: 'upload' | 'download' | 'edit-load' | 'edit-save',
+    async sendSelected (): Promise<void> {
+        const items = this.selectedItems
+        if (!items.length) {
+            return
+        }
+        const targets = this.connections.list(this)
+        if (!targets.length) {
+            this.notifications.notice(this.translate.instant('Open another SFTP connection first'))
+            return
+        }
+        const modal = this.ngbModal.open(SFTPSendToModalComponent)
+        modal.componentInstance.targets = targets
+        const target: SFTPConnectionRef | null = await modal.result.catch(() => null)
+        if (!target?.panel.sftp) {
+            return
+        }
+        await this.sendItemsTo(items, target)
+    }
+
+    async refreshIfHere (dir: string): Promise<void> {
+        if (this.path === dir && this.sftp) {
+            await this.navigate(this.path)
+        }
+    }
+
+    private async sendItemsTo (items: SFTPFile[], target: SFTPConnectionRef): Promise<void> {
+        const destDir = target.path
+        const dest = target.panel.sftp
+        let total = 0
+        for (const item of items) {
+            total += await this.itemTotalSize(item)
+        }
+        const name = items.length === 1
+            ? items[0].name
+            : this.translate.instant('{count} items', { count: items.length })
+        const transfer = new RemoteCopyTransfer(name, total)
+        transfer.setInfo({
+            host: `${this.hostLabel} → ${target.label}`,
+            direction: 'copy',
+            remotePath: destDir,
+        })
+        this.platform.registerTransfer(transfer)
+        this.trackTransfer(transfer)
+        this.beginTransferBatch('copy', name, destDir, this.hostLabel, target.label)
+        this.conflictApplyAll = null
+        try {
+            for (const item of items) {
+                await transfer.waitIfPaused()
+                if (transfer.isCancelled()) {
+                    throw new Error('Transfer cancelled')
+                }
+                await this.copyItemTo(item, dest, destDir, transfer)
+            }
+            transfer.setCompleted(true)
+            this.endTransferBatch()
+        } catch (error) {
+            if (!transfer.isCancelled()) {
+                transfer.cancel()
+            }
+            this.endTransferBatch({
+                status: transfer.isCancelled() ? 'cancelled' : 'error',
+                bytes: transfer.getCompletedBytes(),
+                error: error?.message,
+            })
+            this.notifications.error(error.message)
+        }
+        await target.panel.refreshIfHere(destDir)
+    }
+
+    private async copyItemTo (item: SFTPFile, dest: SFTPSession, destDir: string, transfer: FileTransfer): Promise<void> {
+        const destPath = path.posix.join(destDir, item.name)
+        if (item.isDirectory) {
+            await dest.mkdir(destPath).catch(() => null)
+            transfer.setStatus(item.name)
+            for (const child of await this.sftp.readdir(item.fullPath)) {
+                await transfer.waitIfPaused()
+                if (transfer.isCancelled()) {
+                    throw new Error('Transfer cancelled')
+                }
+                await this.copyItemTo(child, dest, destPath, transfer)
+            }
+            return
+        }
+        const resolved = await this.resolveConflict(destPath, item.name, dest)
+        if (resolved === 'skip') {
+            transfer.reportProgress(item.size)
+            this.recordTransfer('copy', item.name, destPath, 'cancelled', 0)
+            return
+        }
+        transfer.setStatus(item.name)
+        try {
+            await this.sftp.copyTo(dest, item.fullPath, resolved, transfer)
+            this.recordTransfer('copy', item.name, resolved, 'success', item.size)
+        } catch (error) {
+            this.recordTransfer('copy', item.name, resolved, transfer.isCancelled() ? 'cancelled' : 'error', item.size, error?.message)
+            throw error
+        }
+    }
+
+    private async itemTotalSize (item: SFTPFile): Promise<number> {
+        if (!item.isDirectory) {
+            return item.size
+        }
+        let total = 0
+        for (const child of await this.sftp.readdir(item.fullPath)) {
+            total += await this.itemTotalSize(child)
+        }
+        return total
+    }
+
+    private beginTransferBatch (
+        direction: SFTPTransferDirection,
         name: string,
         remotePath: string,
-        status: 'success' | 'error' | 'cancelled',
+        sourceHost?: string,
+        destHost?: string,
+    ): void {
+        if (this.transferBatch) {
+            this.transferBatch.depth++
+            return
+        }
+        this.transferBatch = {
+            depth: 1,
+            direction,
+            name,
+            remotePath,
+            children: [],
+            startedAt: Date.now(),
+            sourceHost,
+            destHost,
+        }
+    }
+
+    private endTransferBatch (fallback?: { status: SFTPTransferStatus, bytes: number, error?: string }): void {
+        if (!this.transferBatch) {
+            return
+        }
+        if (this.transferBatch.depth > 1) {
+            this.transferBatch.depth--
+            return
+        }
+        const batch = this.transferBatch
+        this.transferBatch = null
+        const duration = Date.now() - batch.startedAt
+        if (!batch.children.length) {
+            if (fallback) {
+                this.transferLog.record({
+                    direction: batch.direction,
+                    name: batch.name,
+                    remotePath: batch.remotePath,
+                    host: batch.destHost ? `${batch.sourceHost} → ${batch.destHost}` : this.hostLabel,
+                    status: fallback.status,
+                    bytes: fallback.bytes,
+                    error: fallback.error,
+                    startedAt: batch.startedAt,
+                    duration,
+                    sourceHost: batch.sourceHost,
+                    destHost: batch.destHost,
+                })
+            }
+            return
+        }
+        const status: SFTPTransferStatus = batch.children.some(child => child.status === 'error')
+            ? 'error'
+            : batch.children.some(child => child.status === 'cancelled')
+                ? 'cancelled'
+                : 'success'
+        this.transferLog.record({
+            direction: batch.direction,
+            name: batch.name,
+            remotePath: batch.remotePath,
+            host: batch.destHost ? `${batch.sourceHost} → ${batch.destHost}` : this.hostLabel,
+            status,
+            bytes: batch.children.reduce((sum, child) => sum + child.bytes, 0),
+            children: batch.children,
+            error: batch.children.find(child => child.error)?.error,
+            startedAt: batch.startedAt,
+            duration,
+            sourceHost: batch.sourceHost,
+            destHost: batch.destHost,
+        })
+    }
+
+    private recordTransfer (
+        direction: SFTPTransferDirection,
+        name: string,
+        remotePath: string,
+        status: SFTPTransferStatus,
         bytes: number,
         error?: string,
     ): void {
+        if (this.transferBatch && (direction === 'upload' || direction === 'download' || direction === 'copy')) {
+            this.transferBatch.children.push({ name, remotePath, status, bytes, error })
+            return
+        }
         this.transferLog.record({
             direction,
             name,

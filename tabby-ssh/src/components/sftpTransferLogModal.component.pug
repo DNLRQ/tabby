@@ -1,5 +1,7 @@
 .modal-header
-    h4.modal-title(translate) Transfer history
+    h4.modal-title
+        span(translate) Transfer history
+        span.transfer-host(*ngIf='host') {{host}}
 
 .modal-body
     .d-flex.gap-2.mb-3
@@ -14,7 +16,7 @@
             option(value='error', translate) Error
             option(value='cancelled', translate) Cancelled
 
-    .table-responsive(style='max-height: 360px')
+    .table-responsive.transfer-table
         table.table.table-sm
             thead
                 tr
@@ -22,16 +24,39 @@
                     th(translate) Name
                     th(translate) Direction
                     th(translate) Status
+                    th(translate) Size
+                    th(translate) Duration
             tbody
-                tr(*ngFor='let entry of entries')
-                    td {{entry.time | tabbyDate}}
-                    td
-                        div {{entry.name}}
-                        .text-muted {{entry.remotePath}}
-                    td {{entry.direction}}
-                    td {{entry.status}}
+                ng-container(*ngFor='let entry of entries')
+                    tr(
+                        [class.batch-row]='isBatch(entry)',
+                        [class.expanded]='isExpanded(entry)',
+                        (click)='toggle(entry)'
+                    )
+                        td {{entry.time | tabbyDate}}
+                        td
+                            .transfer-name
+                                i.fas.fa-chevron-right.transfer-chevron(*ngIf='isBatch(entry)')
+                                span {{entry.name}}
+                            .text-muted {{entry.remotePath}}
+                            .text-muted.transfer-count(*ngIf='isBatch(entry)') {{entry.children.length}} {{'files'|translate}}
+                        td {{directionLabel(entry.direction)}}
+                        td {{statusLabel(entry.status)}}
+                        td {{entry.bytes|filesize}}
+                        td {{entry.duration ? formatDuration(entry.duration) : '—'}}
+                    ng-container(*ngIf='isExpanded(entry)')
+                        tr.child-row(*ngFor='let child of entry.children')
+                            td
+                            td
+                                .transfer-name {{child.name}}
+                                .text-muted {{child.remotePath}}
+                                .text-danger(*ngIf='child.error') {{child.error}}
+                            td
+                            td {{statusLabel(child.status)}}
+                            td {{child.bytes|filesize}}
+                            td
                 tr(*ngIf='!entries.length')
-                    td(colspan='4', translate) No transfers yet
+                    td(colspan='6', translate) No transfers yet
 
 .modal-footer
     button.btn.btn-outline-secondary((click)='export()', translate) Export JSON

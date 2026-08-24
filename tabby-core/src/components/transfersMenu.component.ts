@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, HostBinding, OnDestroy, OnInit } from '@angular/core'
 import { TranslateService } from '@ngx-translate/core'
 import { ConfigService } from '../services/config.service'
-import { FileDownload, FileTransfer, PlatformService } from '../api/platform'
+import { BatchFileTransfer, FileDownload, FileTransfer, PlatformService } from '../api/platform'
 
 /** @hidden */
 @Component({
@@ -12,6 +12,7 @@ import { FileDownload, FileTransfer, PlatformService } from '../api/platform'
 export class TransfersMenuComponent implements OnInit, OnDestroy {
     @Input() transfers: FileTransfer[]
     @Output() transfersChange = new EventEmitter<FileTransfer[]>()
+    @Output() openFullScreen = new EventEmitter<void>()
     progressTick = 0
     @HostBinding('class.vibrant') get isVibrant (): boolean {
         return this.config.store.appearance.vibrancy
@@ -39,6 +40,14 @@ export class TransfersMenuComponent implements OnInit, OnDestroy {
 
     isDownload (transfer: FileTransfer): boolean {
         return transfer instanceof FileDownload
+    }
+
+    getDisplayName (transfer: FileTransfer): string {
+        void this.progressTick
+        if (transfer instanceof BatchFileTransfer && !transfer.getCustomName()) {
+            return this.translate.instant('{count} files', { count: transfer.getFileCount() })
+        }
+        return transfer.getName()
     }
 
     getTotal (transfer: FileTransfer): number {

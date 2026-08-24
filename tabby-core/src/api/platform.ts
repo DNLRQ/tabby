@@ -25,6 +25,10 @@ export abstract class FileTransfer {
     abstract getSize (): number
     abstract close (): void
     pausable = false
+    readonly startedAt = Date.now()
+    host = ''
+    direction = ''
+    remotePath = ''
 
     getSpeed (): number {
         return this.lastChunkSpeed
@@ -102,6 +106,26 @@ export abstract class FileTransfer {
         this.increaseProgress(bytes)
     }
 
+    setInfo (info: { host?: string, direction?: string, remotePath?: string }): void {
+        if (info.host !== undefined) {
+            this.host = info.host
+        }
+        if (info.direction !== undefined) {
+            this.direction = info.direction
+        }
+        if (info.remotePath !== undefined) {
+            this.remotePath = info.remotePath
+        }
+    }
+
+    getElapsed (): number {
+        return Date.now() - this.startedAt
+    }
+
+    getHost (): string {
+        return this.host
+    }
+
     protected increaseProgress (bytes: number): void {
         if (!bytes) {
             return
@@ -170,9 +194,110 @@ export class DirectoryUpload {
         return this.childrens
     }
 
+    getFiles (): FileUpload[] {
+        const files: FileUpload[] = []
+        for (const child of this.childrens) {
+            if (child instanceof DirectoryUpload) {
+                files.push(...child.getFiles())
+            } else {
+                files.push(child)
+            }
+        }
+        return files
+    }
+
     pushChildren (item: FileUpload|DirectoryUpload): void {
         this.childrens.push(item)
     }
+}
+
+export class BatchFileTransfer extends FileTransfer {
+    constructor (
+        private children: FileTransfer[],
+        private customName?: string,
+    ) {
+        super()
+        this.pausable = true
+        this.setTotalSize(this.getSize())
+    }
+
+    getName (): string {
+        return this.customName || `${this.children.length} files`
+    }
+
+    getCustomName (): string | undefined {
+        return this.customName
+    }
+
+    getFileCount (): number {
+        return this.children.length
+    }
+
+    getHost (): string {
+        return this.host || this.children.find(child => child.host)?.host || ''
+    }
+
+    getSize (): number {
+        return this.children.reduce((sum, child) => sum + (child.getSize() || child.getTotalSize()), 0)
+    }
+
+    getCompletedBytes (): number {
+        return this.children.reduce((sum, child) => {
+            if (child.isComplete()) {
+                return sum + (child.getSize() || child.getTotalSize() || child.getCompletedBytes())
+            }
+            return sum + child.getCompletedBytes()
+        }, 0)
+    }
+
+    getSpeed (): number {
+        return this.children.reduce((sum, child) => sum + (child.isPaused() ? 0 : child.getSpeed()), 0)
+    }
+
+    getStatus (): string {
+        const current = this.children.find(child => !child.isComplete() && !child.isCancelled())
+        return current?.getName() ?? ''
+    }
+
+    isComplete (): boolean {
+        if (this.isCancelled()) {
+            return false
+        }
+        return this.children.length > 0 && this.children.every(child => child.isComplete() || child.isCancelled())
+    }
+
+    isCancelled (): boolean {
+        return super.isCancelled() || (this.children.length > 0 && this.children.every(child => child.isCancelled()))
+    }
+
+    pause (): void {
+        super.pause()
+        for (const child of this.children) {
+            if (!child.isComplete() && !child.isCancelled()) {
+                child.pause()
+            }
+        }
+    }
+
+    resume (): void {
+        super.resume()
+        for (const child of this.children) {
+            if (child.isPaused()) {
+                child.resume()
+            }
+        }
+    }
+
+    cancel (): void {
+        for (const child of this.children) {
+            if (!child.isComplete() && !child.isCancelled()) {
+                child.cancel()
+            }
+        }
+        super.cancel()
+    }
+
+    close (): void { }
 }
 
 export type PlatformTheme = 'light'|'dark'
@@ -198,6 +323,21 @@ export abstract class PlatformService {
     abstract startUpload (options?: FileUploadOptions): Promise<FileUpload[]>
     abstract startUploadDirectory (paths?: string[]): Promise<DirectoryUpload>
 
+    registerTransfer (transfer: FileTransfer): void {
+        this.fileTransferStarted.next(transfer)
+    }
+
+    protected registerUploadTransfers (transfers: FileTransfer[], name?: string): void {
+        if (!transfers.length) {
+            return
+        }
+        if (transfers.length === 1 && !name) {
+            this.fileTransferStarted.next(transfers[0])
+            return
+        }
+        this.fileTransferStarted.next(new BatchFileTransfer(transfers, name))
+    }
+
     async startUploadFromDragEvent (event: DragEvent, multiple = false): Promise<DirectoryUpload> {
         const result = new DirectoryUpload()
 
@@ -210,7 +350,6 @@ export abstract class PlatformService {
                 if (item.isFile) {
                     item.file((file: File) => {
                         const transfer = new HTMLFileUpload(file)
-                        this.fileTransferStarted.next(transfer)
                         root.pushChildren(transfer)
                         resolve()
                     })
@@ -243,7 +382,15 @@ export abstract class PlatformService {
                 }
             }
         }
-        return Promise.all(promises).then(() => result)
+        return Promise.all(promises).then(() => {
+            const files = result.getFiles()
+            const roots = result.getChildrens()
+            const name = roots.length === 1 && roots[0] instanceof DirectoryUpload
+                ? roots[0].getName()
+                : undefined
+            this.registerUploadTransfers(files, name)
+            return result
+        })
     }
 
     getConfigPath (): string|null {

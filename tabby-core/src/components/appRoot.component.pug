@@ -43,7 +43,7 @@ title-bar(
                     [active]='tab == app.activeTab',
                     [@animateTab]='{value: "in", params: {size: targetTabSize}}',
                     [@.disabled]='hasVerticalTabs() || !config.store.accessibility.animations',
-                    (click)='app.selectTab(tab)',
+                    (click)='selectConnection(tab)',
                     [class.fully-draggable]='hostApp.platform !== Platform.macOS',
                     [ngbTooltip]='tab.customTitle || tab.title'
                 )
@@ -58,20 +58,31 @@ title-bar(
                         [fastHtmlBind]='button.icon'
                     )
 
-                .d-flex(
+                .d-flex.transfers-dropdown(
                     ngbDropdown,
                     container='body',
+                    autoClose='outside',
                     #activeTransfersDropdown='ngbDropdown'
                 )
+                    button.btn.btn-secondary.btn-tab-bar.transfers-popup-anchor(
+                        ngbDropdownToggle,
+                        tabindex='-1',
+                        aria-hidden='true'
+                    )
                     button.btn.btn-secondary.btn-tab-bar(
-                        [hidden]='activeTransfers.length == 0',
+                        *ngIf='transfersUI.hasWindow || activeTransfers.length',
+                        [class.active]='transfersUI.isFullScreen',
                         [ngbTooltip]='"File transfers"|translate',
-                        ngbDropdownToggle
-                    ) !{require('../icons/transfers.svg')}
+                        (click)='openTransfers(); $event.stopPropagation()'
+                    )
+                        span.transfers-btn-icon !{require('../icons/transfers.svg')}
+                        span.transfers-badge(*ngIf='transfersUI.activeCount') {{transfersUI.activeCount}}
                     transfers-menu(
+                        *ngIf='showTransfersPopup',
                         ngbDropdownMenu,
                         [(transfers)]='activeTransfers',
-                        (transfersChange)='onTransfersChange()'
+                        (transfersChange)='onTransfersChange()',
+                        (openFullScreen)='openTransfersFullScreen()'
                     )
 
             .btn-space.background(
@@ -116,5 +127,8 @@ title-bar(
                 [active]='tab == app.activeTab',
                 [tab]='tab',
             )
+
+            .transfers-fullscreen(*ngIf='transfersUI.isFullScreen && transfersUI.pageComponent')
+                ng-container(*ngComponentOutlet='transfersUI.pageComponent')
 
 ng-template(ngbModalContainer)

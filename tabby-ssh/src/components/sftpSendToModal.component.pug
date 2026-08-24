@@ -1,0 +1,18 @@
+.modal-header
+    h4.modal-title(translate) Send to another connection
+
+.modal-body
+    p.text-muted(translate) Choose the SFTP connection and the current folder that will receive the files.
+    .list-group
+        button.list-group-item.list-group-item-action(
+            type='button',
+            *ngFor='let target of targets',
+            [class.active]='selected === target',
+            (click)='selected = target'
+        )
+            .fw-bold {{target.label}}
+            .small.opacity-75 {{target.path}}
+
+.modal-footer
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel
+    button.btn.btn-primary([disabled]='!selected', (click)='confirm()', translate) Send

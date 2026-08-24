@@ -279,6 +279,9 @@
             button.sftp-footer-action(type='button', (click)='downloadSelected(); $event.stopPropagation()')
                 i.fas.fa-download
                 span(translate) Download
+            button.sftp-footer-action(type='button', (click)='sendSelected(); $event.stopPropagation()')
+                i.fas.fa-exchange-alt
+                span(translate) Send to
             button.sftp-footer-action(type='button', (click)='copySelected(); $event.stopPropagation()')
                 i.fas.fa-copy
                 span(translate) Copy

@@ -119,6 +119,12 @@ $tab-border-radius: 4px;
         &.dropdown-toggle::after {
             display: none;
         }
+
+        &.active {
+            color: #fff;
+            border-bottom-color: var(--bs-primary, #0275d8);
+            background: color-mix(in srgb, var(--bs-primary, #0275d8) 18%, transparent);
+        }
     }
 
     &>.tabs {
@@ -191,6 +197,14 @@ $tab-border-radius: 4px;
     }
 }
 
+.transfers-fullscreen {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    min-height: 0;
+}
+
 hotkey-hint {
     position: absolute;
     bottom: 0;
@@ -204,6 +218,36 @@ hotkey-hint {
     height: calc(16px * var(--spaciness));
     fill: white;
     fill-opacity: 0.75;
+}
+
+.transfers-dropdown {
+    position: relative;
+}
+
+.transfers-popup-anchor {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    padding: 0;
+}
+
+.transfers-btn-icon {
+    display: inline-flex;
+    align-items: center;
+}
+
+.transfers-badge {
+    min-width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 99px;
+    background: var(--bs-primary, #0275d8);
+    color: #fff;
+    font-size: 10px;
+    line-height: 16px;
+    font-weight: 700;
 }
 
 ::ng-deep .btn-update svg {

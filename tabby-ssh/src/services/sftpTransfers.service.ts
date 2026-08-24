@@ -1,8 +1,17 @@
 import { Injectable } from '@angular/core'
 import { Subject } from 'rxjs'
+import { FileTransfer } from 'tabby-core'
 
-export type SFTPTransferDirection = 'upload' | 'download' | 'edit-load' | 'edit-save'
+export type SFTPTransferDirection = 'upload' | 'download' | 'edit-load' | 'edit-save' | 'copy'
 export type SFTPTransferStatus = 'success' | 'error' | 'cancelled'
+
+export interface SFTPTransferLogChild {
+    name: string
+    remotePath: string
+    status: SFTPTransferStatus
+    bytes: number
+    error?: string
+}
 
 export interface SFTPTransferLogEntry {
     id: string
@@ -14,10 +23,36 @@ export interface SFTPTransferLogEntry {
     status: SFTPTransferStatus
     bytes: number
     error?: string
+    children?: SFTPTransferLogChild[]
+    startedAt?: number
+    duration?: number
+    sourceHost?: string
+    destHost?: string
 }
 
 const STORAGE_KEY = 'sftpTransferLog'
 const MAX_ENTRIES = 200
+
+export class RemoteCopyTransfer extends FileTransfer {
+    constructor (
+        private label: string,
+        private size: number,
+    ) {
+        super()
+        this.pausable = true
+        this.setTotalSize(size)
+    }
+
+    getName (): string {
+        return this.label
+    }
+
+    getSize (): number {
+        return this.size
+    }
+
+    close (): void { }
+}
 
 /** @hidden */
 @Injectable({ providedIn: 'root' })
@@ -34,8 +69,11 @@ export class SFTPTransfersService {
         }
     }
 
-    getLog (): SFTPTransferLogEntry[] {
-        return this.log
+    getLog (host?: string): SFTPTransferLogEntry[] {
+        if (!host) {
+            return this.log
+        }
+        return this.log.filter(entry => entry.host === host)
     }
 
     record (entry: Omit<SFTPTransferLogEntry, 'id' | 'time'> & Partial<Pick<SFTPTransferLogEntry, 'id' | 'time'>>): void {
@@ -48,13 +86,13 @@ export class SFTPTransfersService {
         this.persist()
     }
 
-    clear (): void {
-        this.log = []
+    clear (host?: string): void {
+        this.log = host ? this.log.filter(entry => entry.host !== host) : []
         this.persist()
     }
 
-    exportJSON (): string {
-        return JSON.stringify(this.log, null, 2)
+    exportJSON (host?: string): string {
+        return JSON.stringify(this.getLog(host), null, 2)
     }
 
     private persist (): void {

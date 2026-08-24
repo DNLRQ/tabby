@@ -70,7 +70,6 @@ export class ElectronPlatformService extends PlatformService {
                 const file = new ElectronFileUpload(path.join(dir, item.name), this.electron)
                 root.pushChildren(file)
                 await wrapPromise(this.zone, file.open())
-                this.fileTransferStarted.next(file)
             }
         }
         return root
@@ -283,12 +282,13 @@ export class ElectronPlatformService extends PlatformService {
             paths = result.filePaths
         }
 
-        return Promise.all(paths.map(async p => {
+        const transfers = await Promise.all(paths.map(async p => {
             const transfer = new ElectronFileUpload(p, this.electron)
             await wrapPromise(this.zone, transfer.open())
-            this.fileTransferStarted.next(transfer)
             return transfer
         }))
+        this.registerUploadTransfers(transfers)
+        return transfers
     }
 
     async startUploadDirectory (paths?: string[]): Promise<DirectoryUpload> {
@@ -308,8 +308,10 @@ export class ElectronPlatformService extends PlatformService {
             paths = result.filePaths
         }
 
+        const folder = new DirectoryUpload(path.basename(paths[0]))
         const root = new DirectoryUpload()
-        root.pushChildren(await this.getAllFiles(paths[0].split(path.sep).join(path.posix.sep), new DirectoryUpload(path.basename(paths[0]))))
+        root.pushChildren(await this.getAllFiles(paths[0].split(path.sep).join(path.posix.sep), folder))
+        this.registerUploadTransfers(root.getFiles(), folder.getName())
         return root
     }
 

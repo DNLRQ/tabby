@@ -2,7 +2,7 @@
 import { Subject, Observable } from 'rxjs'
 import { posix as posixPath } from 'path'
 import { Injector } from '@angular/core'
-import { FileDownload, FileUpload, Logger, LogService } from 'tabby-core'
+import { FileDownload, FileTransfer, FileUpload, Logger, LogService } from 'tabby-core'
 import * as russh from 'russh'
 
 export interface SFTPExecResult {
@@ -213,6 +213,48 @@ export class SFTPSession {
         return new TextDecoder('utf-8', { fatal: false }).decode(buffer)
     }
 
+    async copyTo (
+        dest: SFTPSession,
+        srcPath: string,
+        destPath: string,
+        transfer: FileTransfer,
+    ): Promise<void> {
+        const source = await this.stat(srcPath)
+        if (source.isDirectory) {
+            await dest.mkdir(destPath).catch(() => null)
+            for (const child of await this.readdir(srcPath)) {
+                await transfer.waitIfPaused()
+                if (transfer.isCancelled()) {
+                    throw new Error('Transfer cancelled')
+                }
+                await this.copyTo(dest, child.fullPath, posixPath.join(destPath, child.name), transfer)
+            }
+            return
+        }
+        const reader = await this.open(srcPath, russh.OPEN_READ)
+        const writer = await dest.open(destPath, russh.OPEN_WRITE | russh.OPEN_CREATE | russh.OPEN_TRUNCATE)
+        try {
+            while (true) {
+                await transfer.waitIfPaused()
+                if (transfer.isCancelled()) {
+                    throw new Error('Transfer cancelled')
+                }
+                const chunk = await reader.read()
+                if (!chunk.length) {
+                    break
+                }
+                await writer.write(chunk)
+                transfer.reportProgress(chunk.length)
+            }
+        } finally {
+            await reader.close()
+            await writer.close()
+        }
+        if (source.mode) {
+            await dest.chmod(destPath, source.mode).catch(() => null)
+        }
+    }
+
     async copy (src: string, dest: string): Promise<void> {
         const source = await this.stat(src)
         if (source.isDirectory) {
@@ -285,6 +327,7 @@ export class SFTPSession {
             await handle.close()
             await this.unlink(path).catch(() => null)
             await this.rename(tempPath, path)
+            transfer.setCompleted(true)
             transfer.close()
         } catch (e) {
             transfer.cancel()

@@ -3026,3 +3026,63 @@ msgstr "Descargando {count} elementos"
 msgid "remaining"
 msgstr "restante"
 
+msgid "{count} files"
+msgstr "{count} archivos"
+
+msgid "{count} items"
+msgstr "{count} elementos"
+
+msgid "In progress"
+msgstr "En curso"
+
+msgid "History"
+msgstr "Historial"
+
+msgid "No active transfers"
+msgstr "No hay transferencias en curso"
+
+msgid "Server"
+msgstr "Servidor"
+
+msgid "Duration"
+msgstr "Duración"
+
+msgid "Between connections"
+msgstr "Entre conexiones"
+
+msgid "Send to"
+msgstr "Enviar a"
+
+msgid "Send to another connection"
+msgstr "Enviar a otra conexión"
+
+msgid "Open another SFTP connection first"
+msgstr "Abre primero otra conexión SFTP"
+
+msgid "Choose the SFTP connection and the current folder that will receive the files."
+msgstr "Elige la conexión SFTP y la carpeta actual que recibirá los archivos."
+
+msgid "Send"
+msgstr "Enviar"
+
+msgid "Active transfers and history from every connection"
+msgstr "Transferencias en curso e historial de todas las conexiones"
+
+msgid "Full screen"
+msgstr "Pantalla completa"
+
+msgid "Show transfer popup"
+msgstr "Mostrar ventana emergente de transferencias"
+
+msgid "Show a small popup with the files that are transferring"
+msgstr "Muestra una ventana pequeña con los archivos que se están transfiriendo"
+
+msgid "Open the transfer popup when an upload or download starts"
+msgstr "Abre la ventana emergente cuando empieza una subida o una descarga"
+
+msgid "Clear transfer history?"
+msgstr "¿Borrar el historial de transferencias?"
+
+msgid "This cannot be undone."
+msgstr "Esto no se puede deshacer."
+

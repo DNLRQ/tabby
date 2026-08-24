@@ -127,12 +127,12 @@ export class WebPlatformService extends PlatformService {
                 for (let i = 0; i < (fileList.length ?? 0); i++) {
                     const file = fileList[i]
                     const transfer = new HTMLFileUpload(file)
-                    this.fileTransferStarted.next(transfer)
                     transfers.push(transfer)
                     if (!options?.multiple) {
                         break
                     }
                 }
+                this.registerUploadTransfers(transfers)
                 resolve(transfers)
             }
             this.fileSelector.click()

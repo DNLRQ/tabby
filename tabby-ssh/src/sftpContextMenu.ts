@@ -77,6 +77,11 @@ export class CommonSFTPContextMenu extends SFTPContextMenuItemProvider {
         }
 
         items.push({
+            click: () => panel.sendSelected(),
+            label: this.translate.instant('Send to another connection'),
+        })
+
+        items.push({
             click: () => panel.deleteSelected(),
             label: this.translate.instant('Delete'),
         })

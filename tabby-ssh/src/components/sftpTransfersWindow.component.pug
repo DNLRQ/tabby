@@ -1,0 +1,135 @@
+.transfers-page
+    .transfers-header
+        .transfers-brand
+            .transfers-brand-icon
+                i.fas.fa-exchange-alt
+            .transfers-brand-text
+                .transfers-brand-title(translate) File transfers
+                .transfers-brand-copy(translate) Active transfers and history from every connection
+
+        .transfers-tabs
+            button.transfers-tab(
+                type='button',
+                [class.active]='tab === "active"',
+                (click)='tab = "active"'
+            )
+                span(translate) In progress
+                span.transfers-tab-count(*ngIf='transfersUI.activeCount') {{transfersUI.activeCount}}
+            button.transfers-tab(
+                type='button',
+                [class.active]='tab === "history"',
+                (click)='tab = "history"'
+            )
+                span(translate) History
+
+        .transfers-header-actions
+            ng-container(*ngIf='tab === "history"')
+                button.btn.btn-outline-secondary((click)='export()', translate) Export JSON
+                button.btn.btn-outline-danger((click)='clear()', translate) Clear
+            button.sftp-icon-btn.transfers-close(
+                type='button',
+                [ngbTooltip]='"Close"|translate',
+                (click)='close()'
+            )
+                i.fas.fa-times
+
+    .transfers-live(*ngIf='tab === "active"')
+        .transfer(*ngFor='let transfer of activeTransfers')
+            .transfer-icon
+                i.fas.fa-download(*ngIf='isDownload(transfer)')
+                i.fas.fa-exchange-alt(*ngIf='transfer.direction === "copy"')
+                i.fas.fa-upload(*ngIf='!isDownload(transfer) && transfer.direction !== "copy"')
+            .transfer-main
+                .transfer-title
+                    span.transfer-name([ngbTooltip]='getDisplayName(transfer)') {{getDisplayName(transfer)}}
+                    span.transfer-status(*ngIf='transfer.getStatus()') {{transfer.getStatus()}}
+                .transfer-meta
+                    span(*ngIf='transfer.getHost()') {{transfer.getHost()}}
+                    span(*ngIf='transfer.remotePath') {{transfer.remotePath}}
+                    span {{formatDuration(transfer.getElapsed())}}
+                ngb-progressbar(
+                    [type]='transfer.isComplete() ? "success" : transfer.isCancelled() ? "danger" : transfer.isPaused() ? "warning" : "info"',
+                    [value]='getProgress(transfer)',
+                    height='10px'
+                )
+                .transfer-stats
+                    span {{getCompleted(transfer)|filesize}} / {{getTotal(transfer)|filesize}}
+                    span(*ngIf='!transfer.isComplete() && getRemaining(transfer)') {{getRemaining(transfer)|filesize}} {{'remaining'|translate}}
+                    span(*ngIf='transfer.getSpeed() && !transfer.isPaused()') {{transfer.getSpeed()|filesize}}/s
+                    span(*ngIf='transfer.isPaused()', translate) Paused
+            .transfer-actions
+                button.btn.btn-link(
+                    *ngIf='!transfer.isComplete() && !transfer.isCancelled() && !transfer.isPaused() && transfer.pausable',
+                    [ngbTooltip]='"Pause"|translate',
+                    (click)='pauseTransfer(transfer)'
+                ) ⏸
+                button.btn.btn-link(
+                    *ngIf='transfer.isPaused()',
+                    [ngbTooltip]='"Resume"|translate',
+                    (click)='resumeTransfer(transfer)'
+                ) ▶
+                button.btn.btn-link((click)='removeTransfer(transfer)')
+                    i.fas.fa-times(*ngIf='!transfer.isComplete()')
+                    i.fas.fa-check(*ngIf='transfer.isComplete()')
+        .transfers-empty(*ngIf='!activeTransfers.length')
+            i.fas.fa-inbox
+            div(translate) No active transfers
+
+    .transfers-history(*ngIf='tab === "history"')
+        .d-flex.gap-2.mb-3
+            input.form-control(
+                type='text',
+                [placeholder]='"Filter"|translate',
+                [(ngModel)]='filter'
+            )
+            select.form-control(style='max-width: 180px', [(ngModel)]='status')
+                option(value='', translate) All
+                option(value='success', translate) Success
+                option(value='error', translate) Error
+                option(value='cancelled', translate) Cancelled
+        .table-responsive.transfer-table
+            table.table.table-sm
+                thead
+                    tr
+                        th(translate) Time
+                        th(translate) Server
+                        th(translate) Name
+                        th(translate) Direction
+                        th(translate) Status
+                        th(translate) Size
+                        th(translate) Duration
+                tbody
+                    ng-container(*ngFor='let entry of entries')
+                        tr(
+                            [class.batch-row]='isBatch(entry)',
+                            [class.expanded]='isExpanded(entry)',
+                            (click)='toggle(entry)'
+                        )
+                            td {{entry.time | tabbyDate}}
+                            td
+                                div {{entry.host}}
+                                .text-muted(*ngIf='entry.sourceHost && entry.destHost') {{entry.sourceHost}} → {{entry.destHost}}
+                            td
+                                .transfer-name
+                                    i.fas.fa-chevron-right.transfer-chevron(*ngIf='isBatch(entry)')
+                                    span {{entry.name}}
+                                .text-muted {{entry.remotePath}}
+                                .text-muted.transfer-count(*ngIf='isBatch(entry)') {{entry.children.length}} {{'files'|translate}}
+                            td {{directionLabel(entry.direction)}}
+                            td {{statusLabel(entry.status)}}
+                            td {{entry.bytes|filesize}}
+                            td {{entry.duration ? formatDuration(entry.duration) : '—'}}
+                        ng-container(*ngIf='isExpanded(entry)')
+                            tr.child-row(*ngFor='let child of entry.children')
+                                td
+                                td
+                                td
+                                    .transfer-name {{child.name}}
+                                    .text-muted {{child.remotePath}}
+                                    .text-danger(*ngIf='child.error') {{child.error}}
+                                td
+                                td {{statusLabel(child.status)}}
+                                td {{child.bytes|filesize}}
+                                td
+                    tr(*ngIf='!entries.length')
+                        td(colspan='7', translate) No transfers yet

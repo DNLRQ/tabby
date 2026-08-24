@@ -1,12 +1,17 @@
 .d-flex.align-items-center
     .dropdown-header(translate) File transfers
-    button.btn.btn-link.ms-auto((click)='removeAll(); $event.stopPropagation()') !{require('../icons/times.svg')}
+    button.btn.btn-link.btn-sm.ms-auto(
+        (click)='openFullScreen.emit(); $event.stopPropagation()'
+    )
+        i.fas.fa-expand
+        span.ms-1(translate) Full screen
+    button.btn.btn-link((click)='removeAll(); $event.stopPropagation()') !{require('../icons/times.svg')}
 .transfer(*ngFor='let transfer of transfers', (click)='showTransfer(transfer)')
     .icon(*ngIf='isDownload(transfer)') !{require('../icons/download.svg')}
     .icon(*ngIf='!isDownload(transfer)') !{require('../icons/upload.svg')}
     .main
-        label.no-wrap([ngbTooltip]='transfer.getName()')
-            | {{transfer.getName()}}
+        label.no-wrap([ngbTooltip]='getDisplayName(transfer)')
+            | {{getDisplayName(transfer)}}
             span.ms-2.text-muted(*ngIf='transfer.getStatus()') ({{transfer.getStatus()}})
         ngb-progressbar([type]='transfer.isComplete() ? "success" : transfer.isCancelled() ? "danger" : transfer.isPaused() ? "warning" : "info"', [value]='getProgress(transfer)')
         .metadata

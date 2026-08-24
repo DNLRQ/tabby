@@ -78,8 +78,17 @@ h3(translate) Transfers
 
 .form-line
     .header
+        .title(translate) Show transfer popup
+        .description(translate) Show a small popup with the files that are transferring
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.transfersPopup',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line(*ngIf='config.store.ssh.sftp.transfersPopup')
+    .header
         .title(translate) Show transfer list automatically
-        .description(translate) Open the transfer list when an upload or download starts
+        .description(translate) Open the transfer popup when an upload or download starts
     toggle(
         [(ngModel)]='config.store.ssh.sftp.transfersAutoShow',
         (ngModelChange)='config.save()',

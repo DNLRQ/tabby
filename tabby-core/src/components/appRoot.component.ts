@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { Component, Input, HostListener, HostBinding, ViewChildren, ViewChild } from '@angular/core'
+import { ChangeDetectorRef, Component, Input, HostListener, HostBinding, NgZone, ViewChildren, ViewChild } from '@angular/core'
 import { trigger, style, animate, transition, state } from '@angular/animations'
 import { NgbDropdown, NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { CdkDragDrop } from '@angular/cdk/drag-drop'
@@ -17,6 +17,7 @@ import { SafeModeModalComponent } from './safeModeModal.component'
 import { TabBodyComponent } from './tabBody.component'
 import { SplitTabComponent } from './splitTab.component'
 import { AppService, Command, CommandLocation, FileTransfer, HostWindowService, PlatformService } from '../api'
+import { TransfersUIService } from '../services/transfersUI.service'
 
 function makeTabAnimation (dimension: string, size: number) {
     return [
@@ -85,6 +86,9 @@ export class AppRootComponent {
         public hostApp: HostAppService,
         public config: ConfigService,
         public app: AppService,
+        public transfersUI: TransfersUIService,
+        private zone: NgZone,
+        private changeDetector: ChangeDetectorRef,
         platform: PlatformService,
         log: LogService,
         ngbModal: NgbModal,
@@ -93,6 +97,10 @@ export class AppRootComponent {
         // document.querySelector('app-root')?.remove()
         this.logger = log.create('main')
         this.logger.info('v', platform.getAppVersion())
+
+        this.app.activeTabChange$.subscribe(() => {
+            this.transfersUI.closeFullScreen()
+        })
 
         this.hotkeys.hotkey$.subscribe((hotkey: string) => {
             if (hotkey.startsWith('tab-')) {
@@ -169,11 +177,19 @@ export class AppRootComponent {
             this.app.emitTabDragEnded()
         })
 
+        transfersUI.changed$.subscribe(() => {
+            this.activeTransfers = this.transfersUI.transfers
+        })
+
         platform.fileTransferStarted$.subscribe(transfer => {
-            this.activeTransfers.push(transfer)
-            if (this.config.store.ssh?.sftp?.transfersAutoShow !== false) {
-                this.activeTransfersDropdown.open()
-            }
+            this.zone.run(() => {
+                this.transfersUI.add(transfer)
+                this.activeTransfers = this.transfersUI.transfers
+                this.changeDetector.detectChanges()
+                if (this.showTransfersPopup && this.config.store.ssh?.sftp?.transfersAutoShow !== false && !this.transfersUI.isFullScreen) {
+                    this.openTransfersPopup()
+                }
+            })
         })
 
         config.ready$.toPromise().then(async () => {
@@ -245,9 +261,38 @@ export class AppRootComponent {
     }
 
     onTransfersChange () {
+        this.transfersUI.set(this.activeTransfers)
         if (this.activeTransfers.length === 0) {
-            this.activeTransfersDropdown.close()
+            this.activeTransfersDropdown?.close()
         }
+    }
+
+    get showTransfersPopup (): boolean {
+        return this.config.store?.ssh?.sftp?.transfersPopup !== false
+    }
+
+    openTransfers (): void {
+        this.activeTransfersDropdown?.close()
+        this.transfersUI.open()
+    }
+
+    openTransfersFullScreen (): void {
+        this.activeTransfersDropdown?.close()
+        this.transfersUI.openFullScreen()
+    }
+
+    private openTransfersPopup (): void {
+        setTimeout(() => {
+            this.zone.run(() => {
+                this.changeDetector.detectChanges()
+                this.activeTransfersDropdown?.open()
+            })
+        }, 120)
+    }
+
+    selectConnection (tab: BaseTabComponent): void {
+        this.transfersUI.closeFullScreen()
+        this.app.selectTab(tab)
     }
 
     @HostBinding('class.vibrant') get isVibrant () {

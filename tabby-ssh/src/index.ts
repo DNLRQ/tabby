@@ -34,6 +34,9 @@ import { SFTPConflictModalComponent } from './components/sftpConflictModal.compo
 import { SFTPPermissionsModalComponent } from './components/sftpPermissionsModal.component'
 import { SFTPEditorModalComponent } from './components/sftpEditorModal.component'
 import { SFTPTransferLogModalComponent } from './components/sftpTransferLogModal.component'
+import { SFTPTransfersWindowComponent } from './components/sftpTransfersWindow.component'
+import { SFTPSendToModalComponent } from './components/sftpSendToModal.component'
+import { SFTPTransfersWindowService } from './services/sftpTransfersWindow.service'
 
 /** @hidden */
 @NgModule({
@@ -65,6 +68,8 @@ import { SFTPTransferLogModalComponent } from './components/sftpTransferLogModal
         SFTPPermissionsModalComponent,
         SFTPEditorModalComponent,
         SFTPTransferLogModalComponent,
+        SFTPTransfersWindowComponent,
+        SFTPSendToModalComponent,
         SSHPortForwardingModalComponent,
         SSHPortForwardingConfigComponent,
         SSHSettingsTabComponent,
@@ -75,9 +80,16 @@ import { SFTPTransferLogModalComponent } from './components/sftpTransferLogModal
         KeyboardInteractiveAuthComponent,
         HostKeyPromptModalComponent,
     ],
+    exports: [
+        SFTPTransfersWindowComponent,
+    ],
 })
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export default class SSHModule { }
+export default class SSHModule {
+    constructor (
+        _transfersWindow: SFTPTransfersWindowService,
+    ) { }
+}
 
 export * from './api'
 export { SFTPFile, SFTPSession } from './session/sftp'
