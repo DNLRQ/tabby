@@ -180,88 +180,79 @@ export class SSHSession {
         })
     }
 
+    private isOpenSSHPublicKeyText (contents: Buffer): boolean {
+        const text = contents.toString('utf-8').trim()
+        return /^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-\S+|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-\S+)\s+\S+/.test(text)
+    }
+
     async init (): Promise<void> {
         this.allAuthMethods = [{ type: 'none' }]
-        if (!this.profile.options.auth || this.profile.options.auth === 'publicKey') {
-            if (this.profile.options.privateKeys.length) {
-                for (let index = 0; index < this.profile.options.privateKeys.length; index++) {
-                    // eslint-disable-next-line @typescript-eslint/init-declarations
-                    let contents: Buffer
-                    let pk = this.profile.options.privateKeys[index]
-                    pk = pk.replace('%h', this.profile.options.host)
-                    pk = pk.replace('%r', this.profile.options.user)
-                    pk = await this.ensureKeyInVault(pk, index)
-                    try {
-                        contents = await this.fileProviders.retrieveFile(pk)
-                    } catch (error) {
-                        this.emitServiceMessage(colors.bgYellow.yellow.black(' ! ') + ` Could not load private key ${pk}: ${error}`)
-                        continue
-                    }
+        const loadedKeys: { name: string, contents: Buffer }[] = []
+        if (this.profile.options.privateKeys.length) {
+            for (let index = 0; index < this.profile.options.privateKeys.length; index++) {
+                // eslint-disable-next-line @typescript-eslint/init-declarations
+                let contents: Buffer
+                let pk = this.profile.options.privateKeys[index]
+                pk = pk.replace('%h', this.profile.options.host)
+                pk = pk.replace('%r', this.profile.options.user)
+                pk = await this.ensureKeyInVault(pk, index)
+                try {
+                    contents = await this.fileProviders.retrieveFile(pk)
+                } catch (error) {
+                    this.emitServiceMessage(colors.bgYellow.yellow.black(' ! ') + ` Could not load private key ${pk}: ${error}`)
+                    continue
+                }
+                loadedKeys.push({ name: pk, contents })
+            }
+        }
 
-                    // If the file parses as a public key, it was likely a .pub file
-                    // mistakenly configured in the privateKeys list. In that case,
-                    // skip it here and warn the user instead of treating it as a
-                    // private key.
-                    try {
-                        russh.parsePublicKey(contents.toString('utf-8'))
+        if (!this.profile.options.auth || this.profile.options.auth === 'publicKey') {
+            if (loadedKeys.length) {
+                for (const loaded of loadedKeys) {
+                    if (this.isOpenSSHPublicKeyText(loaded.contents)) {
                         this.emitServiceMessage(
                             colors.bgYellow.yellow.black(' ! ') +
-                            ` Expected a private key, but ${pk} appears to be a public key. Skipping it for private key authentication.`,
+                            ` Expected a private key, but ${loaded.name} appears to be a public key. Skipping it for private key authentication.`,
                         )
                         continue
-                    } catch {
-                        // Not a valid public key; treat the file contents as a private key below.
                     }
-
-                    this.addPublicKeyAuthMethod(pk, contents)
+                    this.addPublicKeyAuthMethod(loaded.name, loaded.contents)
                 }
-            } else {
+            } else if (!this.profile.options.privateKeys.length) {
                 for (const importer of this.privateKeyImporters) {
                     for (const [name, contents] of await importer.getKeys()) {
+                        loadedKeys.push({ name, contents })
                         this.addPublicKeyAuthMethod(name, contents)
                     }
                 }
             }
         }
 
-        if (!this.profile.options.auth || this.profile.options.auth === 'agent') {
+        const usingVaultPrivateKey = loadedKeys.some(loaded =>
+            this.fileProviders.isVaultKey(loaded.name) && !this.isOpenSSHPublicKeyText(loaded.contents),
+        )
+
+        if (!usingVaultPrivateKey && (!this.profile.options.auth || this.profile.options.auth === 'agent')) {
             const spec = await this.getAgentConnectionSpec()
-            if (!spec) {
-                // getAgentConnectionSpec() already emitted a detailed reason.
-            } else {
-                // If user configured specific private keys, try to load their corresponding
-                // .pub files and use them first for agent-identity authentication
-                if (this.profile.options.privateKeys.length) {
-                    for (let pk of this.profile.options.privateKeys) {
-                        pk = pk.replace('%h', this.profile.options.host)
-                        pk = pk.replace('%r', this.profile.options.user)
-
-                        // Try to load as public key file
-                        let pubKeyPath = pk
-                        if (!pk.endsWith('.pub')) {
-                            pubKeyPath = pk + '.pub'
-                        }
-
-                        try {
-                            const pubKeyContent = await this.fileProviders.retrieveFile(pubKeyPath)
-                            const publicKey = russh.parsePublicKey(pubKeyContent.toString('utf-8'))
-                            this.allAuthMethods.push({
-                                type: 'agent',
-                                ...spec,
-                                publicKey,
-                            } as AuthMethod)
-                            this.emitServiceMessage(`Loaded public key for agent auth: ${pubKeyPath}`)
-                        } catch (error) {
-                            // Not a public key file or doesn't exist, skip
-                            this.emitServiceMessage(
-                                `Could not load public key for agent auth from ${pubKeyPath}: ${error}. ` +
-                                `Agent-identity authentication will not be attempted for this key.`,
-                            )
-                        }
+            if (spec) {
+                for (const loaded of loadedKeys) {
+                    if (this.fileProviders.isVaultKey(loaded.name) || loaded.name.endsWith('.pub')) {
+                        continue
+                    }
+                    try {
+                        const publicKey = russh.parsePublicKey(
+                            (await this.fileProviders.retrieveFile(`${loaded.name}.pub`)).toString('utf-8'),
+                        )
+                        this.allAuthMethods.push({
+                            type: 'agent',
+                            ...spec,
+                            publicKey,
+                        } as AuthMethod)
+                    } catch {
+                        // A missing .pub next to a private key is normal.
                     }
                 }
 
-                // Always add fallback agent auth that tries all keys
                 this.allAuthMethods.push({
                     type: 'agent',
                     ...spec,
@@ -735,8 +726,8 @@ export class SSHSession {
             }
             if (method.type === 'publickey') {
                 try {
-                    const key = await this.loadPrivateKey(method.name, method.contents)
                     this.emitServiceMessage(`Trying private key: ${method.name}`)
+                    const key = await this.loadPrivateKey(method.name, method.contents)
                     const result = await this.ssh.authenticateWithKeyPair(this.authUsername, key, null)
                     if (result instanceof russh.AuthenticatedSSHClient) {
                         return result

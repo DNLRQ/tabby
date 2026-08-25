@@ -2,6 +2,9 @@
 import { Component, ViewChild } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { firstBy } from 'thenby'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
 
 import { FileProvidersService, Platform, HostAppService, PromptModalComponent, PartialProfile, ProfilesService, ProfileSettingsComponent, FullyDefined, ProxifiedConfig, NotificationsService, TranslateService, VaultService } from 'tabby-core'
 import { LoginScriptsSettingsComponent } from 'tabby-terminal'
@@ -99,7 +102,13 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
             this.notifications.error(this.translate.instant('Enable the vault to store private keys encrypted inside Tabby'))
             return
         }
-        const ref = await this.fileProviders.storeInVault(`private key for ${this.profile.name}`).catch(() => null)
+        const sshDir = path.join(os.homedir(), '.ssh')
+        const defaultPath = fs.existsSync(sshDir) ? sshDir : os.homedir()
+        const ref = await this.fileProviders.storeInVault(`private key for ${this.profile.name}`, {
+            multiple: false,
+            showHiddenFiles: true,
+            defaultPath,
+        }).catch(() => null)
         if (ref) {
             this.profile.options.privateKeys = [
                 ...this.profile.options.privateKeys,

@@ -177,6 +177,8 @@ export abstract class FileUpload extends FileTransfer {
 
 export interface FileUploadOptions {
     multiple: boolean
+    defaultPath?: string
+    showHiddenFiles?: boolean
 }
 
 export class DirectoryUpload {

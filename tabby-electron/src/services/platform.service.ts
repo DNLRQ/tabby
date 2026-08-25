@@ -267,6 +267,9 @@ export class ElectronPlatformService extends PlatformService {
         if (options.multiple) {
             properties.push('multiSelections')
         }
+        if (options.showHiddenFiles) {
+            properties.push('showHiddenFiles')
+        }
 
         if (!paths) {
             const result = await this.electron.dialog.showOpenDialog(
@@ -274,6 +277,7 @@ export class ElectronPlatformService extends PlatformService {
                 {
                     buttonLabel: this.translate.instant('Select'),
                     properties,
+                    defaultPath: options.defaultPath,
                 },
             )
             if (result.canceled) {

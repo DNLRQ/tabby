@@ -61,6 +61,9 @@ msgstr "Añadir una clave privada"
 msgid "Keys are copied into the vault and encrypted. After adding one, you can delete the original file."
 msgstr "Las llaves se copian a la caja fuerte y se cifran. Después de añadir una, puedes borrar el archivo original."
 
+msgid "SSH keys are usually in ~/.ssh and have no extension, for example id_ed25519 or id_rsa. The file picker opens that folder."
+msgstr "Las llaves SSH suelen estar en ~/.ssh y no tienen extensión, por ejemplo id_ed25519 o id_rsa. El explorador abre esa carpeta."
+
 msgid "Encrypted in vault"
 msgstr "Cifrada en la caja fuerte"
 
@@ -2788,11 +2791,11 @@ msgstr "Copia de seguridad"
 msgid "Encrypted backup"
 msgstr "Copia de seguridad cifrada"
 
-msgid "Export connections and passwords to an encrypted file, or restore them on another computer."
-msgstr "Exporta conexiones y contraseñas a un archivo cifrado, o restáuralas en otro equipo."
+msgid "Export connections, passwords and private keys to an encrypted file, or restore them on another computer."
+msgstr "Exporta conexiones, contraseñas y llaves privadas a un archivo cifrado, o restáuralas en otro equipo."
 
-msgid "Choose whether to export every connection or only the ones you select. The file is encrypted and passwords stay out of plain text."
-msgstr "Elige si exportar todas las conexiones o solo las que selecciones. El archivo va cifrado y las contraseñas no quedan en texto plano."
+msgid "Choose whether to export every connection or only the ones you select. The encrypted file includes passwords and the private keys used by those connections."
+msgstr "Elige si exportar todas las conexiones o solo las que selecciones. El archivo cifrado incluye las contraseñas y las llaves privadas de esas conexiones."
 
 msgid "All connections"
 msgstr "Todas las conexiones"

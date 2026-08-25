@@ -1,5 +1,5 @@
 import { Injectable, InjectFlags, Injector } from '@angular/core'
-import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider, VaultService, ConfigService, VAULT_SECRET_TYPE_FILE } from 'tabby-core'
+import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider, VaultService } from 'tabby-core'
 import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { SSHProfileSettingsComponent } from './components/sshProfileSettings.component'
 import { SSHTabComponent } from './components/sshTab.component'
@@ -54,7 +54,6 @@ export class SSHProfilesService extends QuickConnectProfileProvider<SSHProfile> 
         private translate: TranslateService,
         private injector: Injector,
         private vault: VaultService,
-        private config: ConfigService,
     ) {
         super()
         for (const k of Object.values(SSHAlgorithmType)) {
@@ -130,26 +129,14 @@ export class SSHProfilesService extends QuickConnectProfileProvider<SSHProfile> 
             host: profile.options?.host,
             port: profile.options?.port,
         }
-        const unusedFileIds = new Set(
-            (profile.options?.privateKeys ?? [])
-                .filter(key => key.startsWith('vault://'))
-                .map(key => key.substring('vault://'.length))
-                .filter(id => !(this.config.store.profiles ?? []).some(other =>
-                    other.id !== profile.id
-                    && (other.options?.privateKeys ?? []).includes(`vault://${id}`),
-                )),
-        )
         await this.vault.removeSecrets(secret => {
-            if (secret.type === VAULT_SECRET_TYPE_PASSWORD) {
-                const key = secret.key as { user?: string, host?: string, port?: number }
-                return key.host === passwordKey.host
-                    && key.user === passwordKey.user
-                    && (key.port == null || passwordKey.port == null || Number(key.port) === Number(passwordKey.port))
+            if (secret.type !== VAULT_SECRET_TYPE_PASSWORD) {
+                return false
             }
-            if (secret.type === VAULT_SECRET_TYPE_FILE) {
-                return unusedFileIds.has((secret.key as { id?: string }).id ?? '')
-            }
-            return false
+            const key = secret.key as { user?: string, host?: string, port?: number }
+            return key.host === passwordKey.host
+                && key.user === passwordKey.user
+                && (key.port == null || passwordKey.port == null || Number(key.port) === Number(passwordKey.port))
         })
     }
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@angular/core'
 import { TranslateService } from '@ngx-translate/core'
-import { FileProvider, NotificationsService, SelectorService } from '../api'
-import { VaultFileSecret, VaultService, VAULT_SECRET_TYPE_FILE } from './vault.service'
+import { FileProvider, NotificationsService, SelectorService, FileUploadOptions } from '../api'
+import { VaultFileSecret, VaultService, VaultFileProvider, VAULT_SECRET_TYPE_FILE } from './vault.service'
 
 @Injectable({ providedIn: 'root' })
 export class FileProvidersService {
@@ -20,8 +20,11 @@ export class FileProvidersService {
         })
     }
 
-    async storeInVault (description: string): Promise<string> {
+    async storeInVault (description: string, uploadOptions?: FileUploadOptions): Promise<string> {
         const vaultProvider = await this.requireVaultProvider()
+        if (vaultProvider instanceof VaultFileProvider) {
+            return vaultProvider.selectAndStoreFile(description, uploadOptions)
+        }
         return vaultProvider.selectAndStoreFile(description)
     }
 

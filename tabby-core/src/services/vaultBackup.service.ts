@@ -9,6 +9,7 @@ import { wrapPromise } from '../utils'
 import { PartialProfile, PartialProfileGroup, Profile, ProfileGroup } from '../api/profileProvider'
 import { PlatformService } from '../api/platform'
 import { ConfigService } from './config.service'
+import { FileProvidersService } from './fileProviders.service'
 import { ProfilesService } from './profiles.service'
 import {
     decryptWithPassphrase,
@@ -83,12 +84,15 @@ function secretMatchesProfile (secret: VaultSecret, profile: PartialProfile<Prof
     if (secret.type === 'ssh:key-passphrase') {
         const keys: string[] = options.privateKeys ?? []
         const hash = String(key.hash ?? '')
-        return !!hash && keys.some(path => typeof path === 'string' && path.includes(hash))
+        return !!hash && keys.some(item => typeof item === 'string' && item.includes(hash))
     }
 
     if (secret.type === VAULT_SECRET_TYPE_FILE) {
         const id = String(key.id ?? '')
-        return !!id && JSON.stringify(profile).includes(`vault://${id}`)
+        const keys: string[] = options.privateKeys ?? []
+        return !!id && keys.some(item => typeof item === 'string' && (
+            item === `vault://${id}` || item.endsWith(`/${id}`)
+        ))
     }
 
     return false
@@ -114,6 +118,7 @@ export class VaultBackupService {
         private platform: PlatformService,
         private translate: TranslateService,
         private zone: NgZone,
+        private fileProviders: FileProvidersService,
     ) { }
 
     async generatePassphrase (): Promise<string> {
@@ -148,9 +153,33 @@ export class VaultBackupService {
             ? this.expandRelatedProfiles(allProfiles, profileIds)
             : allProfiles
 
-        const secrets = (vault.secrets ?? []).filter(secret =>
-            !profileIds || selected.some(profile => secretMatchesProfile(secret, profile)),
+        const { fileIds, passphraseHashes, extraFileSecrets } = await this.collectRelatedKeyMaterial(selected, vault.secrets ?? [])
+
+        const secrets = (vault.secrets ?? []).filter(secret => {
+            if (!profileIds) {
+                return true
+            }
+            if (secret.type === VAULT_SECRET_TYPE_FILE) {
+                return fileIds.has(String((secret.key as { id?: string }).id ?? ''))
+            }
+            if (secret.type === 'ssh:key-passphrase') {
+                return passphraseHashes.has(String((secret.key as { hash?: string }).hash ?? ''))
+            }
+            return selected.some(profile => secretMatchesProfile(secret, profile))
+        })
+
+        const secretIds = new Set(
+            secrets
+                .filter(secret => secret.type === VAULT_SECRET_TYPE_FILE)
+                .map(secret => String((secret.key as { id?: string }).id ?? '')),
         )
+        for (const extra of extraFileSecrets) {
+            const id = String((extra.key as { id?: string }).id ?? '')
+            if (id && !secretIds.has(id)) {
+                secrets.push(extra)
+                secretIds.add(id)
+            }
+        }
 
         const groupIds = new Set(selected.map(profile => profile.group).filter(Boolean) as string[])
         const allGroups = this.profiles.getSyncProfileGroups()
@@ -445,6 +474,78 @@ export class VaultBackupService {
         }
 
         return [...selected.values()]
+    }
+
+    private async collectRelatedKeyMaterial (
+        profiles: PartialProfile<Profile>[],
+        vaultSecrets: VaultSecret[],
+    ): Promise<{ fileIds: Set<string>, passphraseHashes: Set<string>, extraFileSecrets: VaultSecret[] }> {
+        const fileIds = new Set<string>()
+        const passphraseHashes = new Set<string>()
+        const extraFileSecrets: VaultSecret[] = []
+        const extraById = new Map<string, VaultSecret>()
+        const vaultFiles = new Map(
+            vaultSecrets
+                .filter(secret => secret.type === VAULT_SECRET_TYPE_FILE)
+                .map(secret => [String((secret.key as { id?: string }).id ?? ''), secret]),
+        )
+
+        for (const profile of profiles) {
+            const keys: string[] = [...(profile.options?.privateKeys ?? [])]
+            if (!keys.length) {
+                continue
+            }
+            const rewritten: string[] = []
+            for (const key of keys) {
+                if (typeof key !== 'string' || !key) {
+                    continue
+                }
+                if (key.startsWith('vault://')) {
+                    const id = key.substring('vault://'.length)
+                    fileIds.add(id)
+                    const stored = vaultFiles.get(id)
+                    if (stored?.value) {
+                        passphraseHashes.add(this.passphraseHashFromFileValue(stored.value))
+                    }
+                    rewritten.push(key)
+                    continue
+                }
+                try {
+                    const contents = await this.fileProviders.retrieveFile(key)
+                    const id = crypto.createHash('sha256').update(contents).digest('hex')
+                    fileIds.add(id)
+                    passphraseHashes.add(this.passphraseHashFromPrivateKey(contents))
+                    if (!vaultFiles.has(id) && !extraById.has(id)) {
+                        const extra = {
+                            type: VAULT_SECRET_TYPE_FILE,
+                            key: {
+                                id,
+                                description: `private key for ${profile.name} (${this.fileProviders.fileNameFromKey(key)})`,
+                            },
+                            value: contents.toString('base64'),
+                        }
+                        extraById.set(id, extra)
+                        extraFileSecrets.push(extra)
+                    }
+                    rewritten.push(`vault://${id}`)
+                } catch {
+                    rewritten.push(key)
+                }
+            }
+            if (profile.options) {
+                profile.options.privateKeys = rewritten
+            }
+        }
+
+        return { fileIds, passphraseHashes, extraFileSecrets }
+    }
+
+    private passphraseHashFromFileValue (value: string): string {
+        return this.passphraseHashFromPrivateKey(Buffer.from(value, 'base64'))
+    }
+
+    private passphraseHashFromPrivateKey (contents: Buffer): string {
+        return crypto.createHash('sha512').update(contents.toString('utf-8')).digest('hex')
     }
 
     private secretKeysMatch (a: Record<string, any>, b: Record<string, any>): boolean {

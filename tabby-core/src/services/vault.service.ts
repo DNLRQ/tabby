@@ -8,7 +8,7 @@ import { UnlockVaultModalComponent } from '../components/unlockVaultModal.compon
 import { NotificationsService } from './notifications.service'
 import { SelectorService } from './selector.service'
 import { FileProvider } from '../api/fileProvider'
-import { PlatformService } from '../api/platform'
+import { PlatformService, FileUploadOptions } from '../api/platform'
 
 const PBKDF_ITERATIONS = 100000
 const PBKDF_DIGEST = 'sha512'
@@ -122,7 +122,6 @@ export class VaultService {
         private ngbModal: NgbModal,
     ) {
         this.getPassphrase = serializeFunction(this.getPassphrase.bind(this))
-        this.save = serializeFunction(this.save.bind(this))
     }
 
     async setEnabled (enabled: boolean, passphrase?: string): Promise<void> {
@@ -292,7 +291,7 @@ export class VaultFileProvider extends FileProvider {
         return this.vault.isEnabled()
     }
 
-    async selectAndStoreFile (description: string): Promise<string> {
+    async selectAndStoreFile (description: string, uploadOptions?: FileUploadOptions): Promise<string> {
         const vault = await this.vault.load()
         if (!vault) {
             throw new Error('Vault is locked')
@@ -315,11 +314,11 @@ export class VaultFileProvider extends FileProvider {
                 return `${this.prefix}${result.key.id}`
             }
         }
-        return this.addNewFile(description)
+        return this.addNewFile(description, uploadOptions)
     }
 
-    async addNewFile (description: string): Promise<string> {
-        const transfers = await this.platform.startUpload()
+    async addNewFile (description: string, uploadOptions?: FileUploadOptions): Promise<string> {
+        const transfers = await this.platform.startUpload(uploadOptions ?? { multiple: false })
         if (!transfers.length) {
             throw new Error('Nothing selected')
         }

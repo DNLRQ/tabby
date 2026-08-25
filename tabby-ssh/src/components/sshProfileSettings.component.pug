@@ -184,6 +184,7 @@ ul.nav-tabs(ngbNav, #nav='ngbNav')
             .mb-3(*ngIf='!profile.options.auth || profile.options.auth === "publicKey"')
                 label(translate) Private keys
                 .text-muted.mb-2(translate) Keys are copied into the vault and encrypted. After adding one, you can delete the original file.
+                .text-muted.mb-2(translate) SSH keys are usually in ~/.ssh and have no extension, for example id_ed25519 or id_rsa. The file picker opens that folder.
                 .list-group.mb-2
                     .list-group-item.d-flex.align-items-center.p-1.ps-3(*ngFor='let path of profile.options.privateKeys')
                         i.fas.fa-key
