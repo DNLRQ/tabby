@@ -1,6 +1,6 @@
 import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import deepClone from 'clone-deep'
-import { Component, Inject } from '@angular/core'
+import { Component, Inject, TemplateRef, ViewChild } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { ConfigService, HostAppService, Profile, ProfilesService, PlatformService, BaseComponent, PartialProfile, ProfileProvider, TranslateService, Platform, ProfileGroup, PartialProfileGroup, QuickConnectProfileProvider } from 'tabby-core'
 import { EditProfileModalComponent } from './editProfileModal.component'
@@ -30,6 +30,8 @@ export class ProfilesSettingsTabComponent extends BaseComponent {
 
     filter = ''
     Platform = Platform
+    deleteConfirmMessage = ''
+    @ViewChild('deleteProfileModal') deleteProfileModal: TemplateRef<unknown>
     private descriptionCache = new Map<string, string|null>()
 
     constructor (
@@ -89,21 +91,13 @@ export class ProfilesSettingsTabComponent extends BaseComponent {
     }
 
     async deleteProfile (profile: PartialProfile<Profile>): Promise<void> {
-        if ((await this.platform.showMessageBox(
-            {
-                type: 'warning',
-                message: this.translate.instant('Delete "{name}"?', profile),
-                buttons: [
-                    this.translate.instant('Delete'),
-                    this.translate.instant('Keep'),
-                ],
-                defaultId: 1,
-                cancelId: 1,
-            },
-        )).response === 0) {
-            await this.profilesService.deleteProfile(profile)
-            await this.config.save()
+        this.deleteConfirmMessage = this.translate.instant('Delete "{name}"?', profile)
+        const confirmed = await this.ngbModal.open(this.deleteProfileModal, { size: 'sm' }).result.catch(() => false)
+        if (!confirmed) {
+            return
         }
+        await this.profilesService.deleteProfile(profile)
+        await this.config.save()
     }
 
     async newProfileGroup (): Promise<void> {

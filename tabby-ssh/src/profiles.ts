@@ -1,9 +1,9 @@
 import { Injectable, InjectFlags, Injector } from '@angular/core'
-import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider } from 'tabby-core'
+import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider, VaultService, ConfigService, VAULT_SECRET_TYPE_FILE } from 'tabby-core'
 import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { SSHProfileSettingsComponent } from './components/sshProfileSettings.component'
 import { SSHTabComponent } from './components/sshTab.component'
-import { PasswordStorageService } from './services/passwordStorage.service'
+import { PasswordStorageService, VAULT_SECRET_TYPE_PASSWORD } from './services/passwordStorage.service'
 import { SSHAlgorithmType, SSHProfile } from './api'
 import { SSHProfileImporter } from './api/importer'
 import { defaultAlgorithms } from './algorithms'
@@ -53,6 +53,8 @@ export class SSHProfilesService extends QuickConnectProfileProvider<SSHProfile> 
         private passwordStorage: PasswordStorageService,
         private translate: TranslateService,
         private injector: Injector,
+        private vault: VaultService,
+        private config: ConfigService,
     ) {
         super()
         for (const k of Object.values(SSHAlgorithmType)) {
@@ -108,8 +110,47 @@ export class SSHProfilesService extends QuickConnectProfileProvider<SSHProfile> 
         return profile.options?.host ?? ''
     }
 
-    deleteProfile (profile: SSHProfile): void {
-        this.passwordStorage.deletePassword(profile)
+    async deleteProfile (profile: SSHProfile): Promise<void> {
+        try {
+            if (this.vault.isEnabled()) {
+                if (this.vault.isOpen()) {
+                    await this.removeVaultSecrets(profile)
+                }
+                return
+            }
+            await this.passwordStorage.deletePassword(profile)
+        } catch (e) {
+            console.warn('Could not clean stored secrets for profile', profile.name, e)
+        }
+    }
+
+    private async removeVaultSecrets (profile: SSHProfile): Promise<void> {
+        const passwordKey = {
+            user: profile.options?.user,
+            host: profile.options?.host,
+            port: profile.options?.port,
+        }
+        const unusedFileIds = new Set(
+            (profile.options?.privateKeys ?? [])
+                .filter(key => key.startsWith('vault://'))
+                .map(key => key.substring('vault://'.length))
+                .filter(id => !(this.config.store.profiles ?? []).some(other =>
+                    other.id !== profile.id
+                    && (other.options?.privateKeys ?? []).includes(`vault://${id}`),
+                )),
+        )
+        await this.vault.removeSecrets(secret => {
+            if (secret.type === VAULT_SECRET_TYPE_PASSWORD) {
+                const key = secret.key as { user?: string, host?: string, port?: number }
+                return key.host === passwordKey.host
+                    && key.user === passwordKey.user
+                    && (key.port == null || passwordKey.port == null || Number(key.port) === Number(passwordKey.port))
+            }
+            if (secret.type === VAULT_SECRET_TYPE_FILE) {
+                return unusedFileIds.has((secret.key as { id?: string }).id ?? '')
+            }
+            return false
+        })
     }
 
     quickConnect (query: string): PartialProfile<SSHProfile> {

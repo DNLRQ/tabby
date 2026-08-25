@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core'
-import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider } from 'tabby-core'
+import { NewTabParameters, PartialProfile, TranslateService, QuickConnectProfileProvider, VaultService } from 'tabby-core'
 import { marker as _ } from '@biesbjerg/ngx-translate-extract-marker'
 import { RDPProfileSettingsComponent } from './components/rdpProfileSettings.component'
 import { RDPTabComponent } from './components/rdpTab.component'
@@ -31,6 +31,7 @@ export class RDPProfilesService extends QuickConnectProfileProvider<RDPProfile> 
     constructor (
         private passwordStorage: PasswordStorageService,
         private translate: TranslateService,
+        private vault: VaultService,
     ) {
         super()
     }
@@ -75,8 +76,15 @@ export class RDPProfilesService extends QuickConnectProfileProvider<RDPProfile> 
         return profile.options?.host ?? ''
     }
 
-    deleteProfile (profile: RDPProfile): void {
-        this.passwordStorage.deletePassword(profile)
+    async deleteProfile (profile: RDPProfile): Promise<void> {
+        try {
+            if (this.vault.isEnabled() && !this.vault.isOpen()) {
+                return
+            }
+            await this.passwordStorage.deletePassword(profile)
+        } catch (e) {
+            console.warn('Could not delete stored password for profile', profile.name, e)
+        }
     }
 
     quickConnect (query: string): PartialProfile<RDPProfile> {

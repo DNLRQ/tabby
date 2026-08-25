@@ -155,3 +155,10 @@ ul.nav-tabs(ngbNav, #nav='ngbNav')
                         i.fas.fa-trash-arrow-up
 
 div([ngbNavOutlet]='nav')
+
+ng-template(#deleteProfileModal let-modal)
+    .modal-header
+        h4.modal-title {{deleteConfirmMessage}}
+    .modal-footer
+        button.btn.btn-secondary((click)='modal.dismiss()', translate) Keep
+        button.btn.btn-danger((click)='modal.close(true)', translate) Delete

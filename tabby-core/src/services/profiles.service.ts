@@ -135,9 +135,10 @@ export class ProfilesService {
     * Delete a Profile from config
     */
     async deleteProfile (profile: PartialProfile<Profile>): Promise<void> {
-        this.providerForProfile(profile)?.deleteProfile(this.getConfigProxyForProfile(profile))
+        await this.providerForProfile(profile)?.deleteProfile(this.getConfigProxyForProfile(profile))
         this.config.store.profiles = this.config.store.profiles.filter(p => p.id !== profile.id)
         this.pruneRecentProfiles()
+        this.quickAccessChanged$.next()
 
         const profileHotkeyName = ProfilesService.getProfileHotkeyName(profile)
         if (this.config.store.hotkeys.profile.hasOwnProperty(profileHotkeyName)) {
@@ -154,7 +155,7 @@ export class ProfilesService {
     */
     async bulkDeleteProfiles (filter: (p: PartialProfile<Profile>) => boolean): Promise<void> {
         for (const profile of this.config.store.profiles.filter(filter)) {
-            this.providerForProfile(profile)?.deleteProfile(this.getConfigProxyForProfile(profile))
+            await this.providerForProfile(profile)?.deleteProfile(this.getConfigProxyForProfile(profile))
 
             const profileHotkeyName = ProfilesService.getProfileHotkeyName(profile)
             if (this.config.store.hotkeys.profile.hasOwnProperty(profileHotkeyName)) {
@@ -167,6 +168,7 @@ export class ProfilesService {
 
         this.config.store.profiles = this.config.store.profiles.filter(x => !filter(x))
         this.pruneRecentProfiles()
+        this.quickAccessChanged$.next()
     }
 
     async openNewTabForProfile <P extends Profile> (profile: PartialProfile<P>): Promise<BaseTabComponent|null> {

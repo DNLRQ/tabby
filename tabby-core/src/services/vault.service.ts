@@ -122,6 +122,7 @@ export class VaultService {
         private ngbModal: NgbModal,
     ) {
         this.getPassphrase = serializeFunction(this.getPassphrase.bind(this))
+        this.save = serializeFunction(this.save.bind(this))
     }
 
     async setEnabled (enabled: boolean, passphrase?: string): Promise<void> {
@@ -240,12 +241,20 @@ export class VaultService {
     }
 
     async removeSecret (type: string, key: VaultSecretKey): Promise<void> {
+        await this.removeSecrets(secret => secret.type === type && this.keyMatches(key, secret))
+    }
+
+    async removeSecrets (match: (secret: VaultSecret) => boolean): Promise<void> {
         await this.ready$.toPromise()
         const vault = await this.load()
         if (!vault) {
             return
         }
-        vault.secrets = vault.secrets.filter(s => s.type !== type || !this.keyMatches(key, s))
+        const secrets = vault.secrets.filter(secret => !match(secret))
+        if (secrets.length === vault.secrets.length) {
+            return
+        }
+        vault.secrets = secrets
         await this.save(vault)
     }
 
