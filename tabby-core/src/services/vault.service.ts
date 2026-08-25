@@ -327,6 +327,19 @@ export class VaultFileProvider extends FileProvider {
         return `${this.prefix}${id}`
     }
 
+    async storeFile (description: string, fileName: string, contents: Uint8Array): Promise<string> {
+        const id = (await wrapPromise(this.zone, promisify(crypto.randomBytes)(32))).toString('hex')
+        await this.vault.addSecret({
+            type: VAULT_SECRET_TYPE_FILE,
+            key: {
+                id,
+                description: `${description} (${fileName})`,
+            },
+            value: Buffer.from(contents).toString('base64'),
+        })
+        return `${this.prefix}${id}`
+    }
+
     async retrieveFile (key: string): Promise<Buffer> {
         if (!key.startsWith(this.prefix)) {
             throw new Error('Incorrect type')

@@ -183,10 +183,14 @@ ul.nav-tabs(ngbNav, #nav='ngbNav')
 
             .mb-3(*ngIf='!profile.options.auth || profile.options.auth === "publicKey"')
                 label(translate) Private keys
+                .text-muted.mb-2(translate) Keys are copied into the vault and encrypted. After adding one, you can delete the original file.
                 .list-group.mb-2
                     .list-group-item.d-flex.align-items-center.p-1.ps-3(*ngFor='let path of profile.options.privateKeys')
                         i.fas.fa-key
-                        .no-wrap.me-auto {{path}}
+                        .min-width-0.me-auto
+                            .no-wrap {{keyLabel(path)}}
+                            small.text-success(*ngIf='isVaultKey(path)', translate) Encrypted in vault
+                            small.text-warning(*ngIf='isMissingKey(path)', translate) Original file is missing. Add the key again to store it in the vault.
                         button.btn.btn-link((click)='removePrivateKey(path)')
                             i.fas.fa-trash
                 button.btn.btn-secondary((click)='addPrivateKey()')

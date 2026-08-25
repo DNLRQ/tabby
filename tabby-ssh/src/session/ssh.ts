@@ -150,6 +150,28 @@ export class SSHSession {
         })
     }
 
+    private async ensureKeyInVault (key: string, index: number): Promise<string> {
+        if (this.fileProviders.isVaultKey(key)) {
+            return key
+        }
+        try {
+            const vaultRef = await this.fileProviders.importIntoVault(key, `private key for ${this.profile.name}`)
+            if (vaultRef !== key) {
+                this.profile.options.privateKeys[index] = vaultRef
+                const stored = this.config.store.profiles.find(profile => profile.id === this.profile.id)
+                if (stored?.options) {
+                    stored.options.privateKeys = [...this.profile.options.privateKeys]
+                    await this.config.save()
+                }
+                this.emitServiceMessage(this.translate.instant('Private key stored encrypted in the vault. You can delete the original file from disk.'))
+                return vaultRef
+            }
+        } catch {
+            // Keep the original path if the file is already gone.
+        }
+        return key
+    }
+
     private addPublicKeyAuthMethod (name: string, contents: Buffer) {
         this.allAuthMethods.push({
             type: 'publickey',
@@ -162,11 +184,13 @@ export class SSHSession {
         this.allAuthMethods = [{ type: 'none' }]
         if (!this.profile.options.auth || this.profile.options.auth === 'publicKey') {
             if (this.profile.options.privateKeys.length) {
-                for (let pk of this.profile.options.privateKeys) {
+                for (let index = 0; index < this.profile.options.privateKeys.length; index++) {
                     // eslint-disable-next-line @typescript-eslint/init-declarations
                     let contents: Buffer
+                    let pk = this.profile.options.privateKeys[index]
                     pk = pk.replace('%h', this.profile.options.host)
                     pk = pk.replace('%r', this.profile.options.user)
+                    pk = await this.ensureKeyInVault(pk, index)
                     try {
                         contents = await this.fileProviders.retrieveFile(pk)
                     } catch (error) {

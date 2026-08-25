@@ -3,7 +3,7 @@ import { Component, ViewChild } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { firstBy } from 'thenby'
 
-import { FileProvidersService, Platform, HostAppService, PromptModalComponent, PartialProfile, ProfilesService, ProfileSettingsComponent, FullyDefined, ProxifiedConfig } from 'tabby-core'
+import { FileProvidersService, Platform, HostAppService, PromptModalComponent, PartialProfile, ProfilesService, ProfileSettingsComponent, FullyDefined, ProxifiedConfig, NotificationsService, TranslateService, VaultService } from 'tabby-core'
 import { LoginScriptsSettingsComponent } from 'tabby-terminal'
 import { PasswordStorageService } from '../services/passwordStorage.service'
 import { ForwardedPortConfig, SSHAlgorithmType, SSHProfile } from '../api'
@@ -24,6 +24,8 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
     supportedAlgorithms = supportedAlgorithms
     algorithms: Record<string, Record<string, boolean>> = {}
     jumpHosts: PartialProfile<SSHProfile>[]
+    keyLabels: Record<string, string> = {}
+    missingKeys = new Set<string>()
     @ViewChild('loginScriptsSettings') loginScriptsSettings: LoginScriptsSettingsComponent|null
 
     constructor (
@@ -32,6 +34,9 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
         private passwordStorage: PasswordStorageService,
         private ngbModal: NgbModal,
         private fileProviders: FileProvidersService,
+        private notifications: NotificationsService,
+        private translate: TranslateService,
+        private vault: VaultService,
     ) { }
 
     async ngOnInit () {
@@ -62,6 +67,9 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
                 console.error('Could not check for saved password', e)
             }
         }
+
+        await this.migrateFileKeysToVault()
+        await this.refreshKeyLabels()
     }
 
     getJumpHostLabel (p: PartialProfile<SSHProfile>) {
@@ -87,17 +95,72 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
     }
 
     async addPrivateKey () {
-        const ref = await this.fileProviders.selectAndStoreFile(`private key for ${this.profile.name}`).catch(() => null)
+        if (!this.vault.isEnabled()) {
+            this.notifications.error(this.translate.instant('Enable the vault to store private keys encrypted inside Tabby'))
+            return
+        }
+        const ref = await this.fileProviders.storeInVault(`private key for ${this.profile.name}`).catch(() => null)
         if (ref) {
             this.profile.options.privateKeys = [
                 ...this.profile.options.privateKeys,
                 ref,
             ]
+            await this.refreshKeyLabels()
+            this.notifications.info(this.translate.instant('Private key stored encrypted in the vault. You can delete the original file from disk.'))
         }
     }
 
     removePrivateKey (path: string) {
         this.profile.options.privateKeys = this.profile.options.privateKeys.filter(x => x !== path)
+        this.missingKeys.delete(path)
+        delete this.keyLabels[path]
+    }
+
+    isVaultKey (path: string): boolean {
+        return this.fileProviders.isVaultKey(path)
+    }
+
+    isMissingKey (path: string): boolean {
+        return this.missingKeys.has(path)
+    }
+
+    keyLabel (path: string): string {
+        return this.keyLabels[path] || this.fileProviders.fileNameFromKey(path)
+    }
+
+    private async migrateFileKeysToVault (): Promise<void> {
+        if (!this.vault.isEnabled()) {
+            return
+        }
+        const keys = [...(this.profile.options.privateKeys ?? [])]
+        let changed = false
+        for (const key of keys) {
+            if (this.fileProviders.isVaultKey(key)) {
+                continue
+            }
+            try {
+                const vaultRef = await this.fileProviders.importIntoVault(key, `private key for ${this.profile.name}`)
+                this.profile.options.privateKeys = this.profile.options.privateKeys.map(item => item === key ? vaultRef : item)
+                changed = true
+            } catch {
+                try {
+                    await this.fileProviders.retrieveFile(key)
+                } catch {
+                    this.missingKeys.add(key)
+                }
+            }
+        }
+        if (changed) {
+            this.notifications.info(this.translate.instant('Private key stored encrypted in the vault. You can delete the original file from disk.'))
+        }
+    }
+
+    private async refreshKeyLabels (): Promise<void> {
+        const labels: Record<string, string> = {}
+        for (const key of this.profile.options.privateKeys ?? []) {
+            labels[key] = await this.fileProviders.getStoredFileLabel(key)
+        }
+        this.keyLabels = labels
     }
 
     save () {

@@ -58,6 +58,21 @@ msgstr "Agregar un puerto de reenvío"
 msgid "Add a private key"
 msgstr "Añadir una clave privada"
 
+msgid "Keys are copied into the vault and encrypted. After adding one, you can delete the original file."
+msgstr "Las llaves se copian a la caja fuerte y se cifran. Después de añadir una, puedes borrar el archivo original."
+
+msgid "Encrypted in vault"
+msgstr "Cifrada en la caja fuerte"
+
+msgid "Original file is missing. Add the key again to store it in the vault."
+msgstr "Falta el archivo original. Vuelve a añadir la llave para guardarla en la caja fuerte."
+
+msgid "Private key stored encrypted in the vault. You can delete the original file from disk."
+msgstr "Llave guardada cifrada en la caja fuerte. Ya puedes borrar el archivo original del disco."
+
+msgid "Enable the vault to store private keys encrypted inside Tabby"
+msgstr "Activa la caja fuerte para guardar las llaves cifradas dentro de Tabby"
+
 #: locale/tmp-html/tabby-settings/src/components/multiHotkeyInput.component.html:8
 msgid "Add..."
 msgstr "Añadir..."
