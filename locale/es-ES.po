@@ -459,6 +459,9 @@ msgstr "Copiar al seleccionar"
 msgid "Copy to clipboard"
 msgstr "Copiar al portapapeles"
 
+msgid "Copied to clipboard"
+msgstr "Copiado al portapapeles"
+
 #: locale/tmp-html/tabby-terminal/src/components/terminalSettingsTab.component.html:103
 msgid "Copy with formatting"
 msgstr "Copiar con formato"
@@ -2757,6 +2760,102 @@ msgstr "Vault está bloqueado"
 #: locale/tmp-html/tabby-settings/src/components/vaultSettingsTab.component.html:3
 msgid "Vault is not configured"
 msgstr "Vault no está configurado"
+
+msgid "Create vault backup"
+msgstr "Crear copia de seguridad"
+
+msgid "Restore vault backup"
+msgstr "Cargar copia de seguridad"
+
+msgid "Backup"
+msgstr "Copia de seguridad"
+
+msgid "Encrypted backup"
+msgstr "Copia de seguridad cifrada"
+
+msgid "Export connections and passwords to an encrypted file, or restore them on another computer."
+msgstr "Exporta conexiones y contraseñas a un archivo cifrado, o restáuralas en otro equipo."
+
+msgid "Choose whether to export every connection or only the ones you select. The file is encrypted and passwords stay out of plain text."
+msgstr "Elige si exportar todas las conexiones o solo las que selecciones. El archivo va cifrado y las contraseñas no quedan en texto plano."
+
+msgid "All connections"
+msgstr "Todas las conexiones"
+
+msgid "Selected connections"
+msgstr "Algunas conexiones"
+
+msgid "Search connections"
+msgstr "Buscar conexiones"
+
+msgid "Select visible"
+msgstr "Seleccionar visibles"
+
+msgid "Continue"
+msgstr "Continuar"
+
+msgid "Backup password"
+msgstr "Contraseña de la copia"
+
+msgid "This password is shown only once. Copy it now; it will be cleared from memory when you close this window."
+msgstr "Esta contraseña se muestra una sola vez. Cópiala ahora; se borrará de la memoria al cerrar esta ventana."
+
+msgid "Connections in this backup: {count}"
+msgstr "Conexiones en esta copia: {count}"
+
+msgid "Copy password"
+msgstr "Copiar contraseña"
+
+msgid "Password cleared from memory"
+msgstr "Contraseña borrada de la memoria"
+
+msgid "Copied. Store it in a safe place before sharing the file."
+msgstr "Copiada. Guárdala en un lugar seguro antes de compartir el archivo."
+
+msgid "I saved the password"
+msgstr "Ya guardé la contraseña"
+
+msgid "Could not create the backup"
+msgstr "No se pudo crear la copia de seguridad"
+
+msgid "Could not restore the backup"
+msgstr "No se pudo cargar la copia de seguridad"
+
+msgid "The backup file is not valid"
+msgstr "El archivo de copia no es válido"
+
+msgid "Incorrect backup password"
+msgstr "Contraseña de la copia incorrecta"
+
+msgid "Enable the vault before restoring a backup"
+msgstr "Activa la caja fuerte antes de cargar una copia de seguridad"
+
+msgid "Restored {profiles} connections and {secrets} secrets"
+msgstr "Se restauraron {profiles} conexiones y {secrets} secretos"
+
+msgid "Restored {profiles} connections ({replaced} replaced, {skipped} skipped) and {secrets} secrets"
+msgstr "Se restauraron {profiles} conexiones ({replaced} reemplazadas, {skipped} omitidas) y {secrets} secretos"
+
+msgid "Connection already exists"
+msgstr "La conexión ya existe"
+
+msgid "This connection from the backup matches one you already have. What should we do?"
+msgstr "Esta conexión de la copia coincide con una que ya tienes. ¿Qué quieres hacer?"
+
+msgid "Incoming"
+msgstr "De la copia"
+
+msgid "Existing"
+msgstr "Guardada"
+
+msgid "Apply to all remaining connections"
+msgstr "Aplicar a las conexiones restantes"
+
+msgid "Save as new connection"
+msgstr "Guardar como otra conexión"
+
+msgid "{name} (copy)"
+msgstr "{name} (copia)"
 
 #: tabby-core/src/services/fileProviders.service.ts:40
 msgid "Vault master passphrase needs to be set to allow storing secrets"

@@ -12,6 +12,15 @@ const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..'
 
 process.env.ARCH = (process.env.ARCH === 'arm' ? 'armv7l' : process.env.ARCH) || process.arch
 
+function buildLatestSources () {
+    if (process.env.SKIP_WEBPACK === '1') {
+        console.log('SKIP_WEBPACK=1; using existing dist folders')
+        return
+    }
+    console.log('Compiling latest sources...')
+    execSync('npm run build', { stdio: 'inherit', cwd: repoRoot })
+}
+
 function syncBuiltinPlugins () {
     const target = path.join(repoRoot, 'builtin-plugins')
     if (!fs.existsSync(target)) {
@@ -41,13 +50,17 @@ function syncBuiltinPlugins () {
         }
         const pkg = path.join(src, 'package.json')
         if (fs.existsSync(pkg)) {
-            fs.copyFileSync(pkg, path.join(dest, 'package.json'))
+            const json = JSON.parse(fs.readFileSync(pkg, 'utf8'))
+            json.version = vars.version
+            fs.writeFileSync(path.join(dest, 'package.json'), `${JSON.stringify(json, null, 2)}\n`)
         }
     }
     console.log('Copied latest plugin builds into builtin-plugins')
 }
 
+buildLatestSources()
 syncBuiltinPlugins()
+console.log(`Packaging Tabby ${vars.version}`)
 
 
 function hasCommand (cmd) {

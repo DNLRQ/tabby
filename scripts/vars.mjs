@@ -9,14 +9,27 @@ import * as url from 'url'
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url))
 
 const electronInfo = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../node_modules/electron/package.json')))
+const appPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../app/package.json'), 'utf8'))
 
-export let version = childProcess.execSync('git describe --tags', { encoding:'utf-8' })
-version = version.substring(1).trim()
-version = version.replace('-', '-c')
+function versionFromGit () {
+    let described = childProcess.execSync('git describe --tags', { encoding: 'utf-8' }).trim()
+    if (described.startsWith('v')) {
+        described = described.slice(1)
+    }
 
-if (version.includes('-c')) {
-    version = semver.inc(version, 'prepatch').replace('-0', `-nightly.${process.env.REV ?? 0}`)
+    const afterTag = described.match(/^(.+)-(\d+)-g[0-9a-f]+$/i)
+    if (!afterTag) {
+        return described
+    }
+
+    const next = semver.inc(afterTag[1], 'patch')
+    const rev = process.env.REV ?? afterTag[2]
+    return `${next}-nightly.${rev}`
 }
+
+export let version = (process.env.TABBY_VERSION || '').trim()
+    || (process.env.TABBY_USE_PACKAGE_VERSION === '1' ? appPackage.version : '')
+    || versionFromGit()
 
 export const builtinPlugins = [
     'tabby-core',

@@ -1,0 +1,25 @@
+.modal-header
+    h4.modal-title(translate) Connection already exists
+
+.modal-body
+    p.mb-3(translate) This connection from the backup matches one you already have. What should we do?
+
+    .vault-backup-conflict
+        .vault-backup-conflict-card
+            .vault-backup-conflict-label(translate) Incoming
+            .vault-backup-conflict-name {{incoming?.name}}
+            .vault-backup-conflict-meta.text-muted {{hostLabel(incoming)}}
+        .vault-backup-conflict-card
+            .vault-backup-conflict-label(translate) Existing
+            .vault-backup-conflict-name {{existing?.name}}
+            .vault-backup-conflict-meta.text-muted {{hostLabel(existing)}}
+
+    label.d-flex.align-items-center.gap-2.mt-3
+        input(type='checkbox', [(ngModel)]='applyToAll')
+        span(translate) Apply to all remaining connections
+
+.modal-footer
+    button.btn.btn-outline-secondary((click)='choose("skip")', translate) Skip
+    button.btn.btn-outline-warning((click)='choose("duplicate")', translate) Save as new connection
+    button.btn.btn-danger((click)='choose("replace")', translate) Replace
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel

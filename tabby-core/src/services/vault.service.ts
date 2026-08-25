@@ -62,12 +62,11 @@ function deriveVaultKey (passphrase: string, salt: Buffer): Promise<Buffer> {
     )
 }
 
-async function encryptVault (content: Vault, passphrase: string): Promise<StoredVault> {
+export async function encryptWithPassphrase (plaintext: string, passphrase: string): Promise<StoredVault> {
     const keySalt = await promisify(crypto.randomBytes)(PBKDF_SALT_LENGTH)
     const iv = await promisify(crypto.randomBytes)(CRYPT_IV_LENGTH)
     const key = await deriveVaultKey(passphrase, keySalt)
 
-    const plaintext = JSON.stringify(content)
     const cipher = crypto.createCipheriv(CRYPT_ALG, key, iv)
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()])
 
@@ -79,7 +78,7 @@ async function encryptVault (content: Vault, passphrase: string): Promise<Stored
     }
 }
 
-async function decryptVault (vault: StoredVault, passphrase: string): Promise<Vault> {
+export async function decryptWithPassphrase (vault: StoredVault, passphrase: string): Promise<string> {
     if (vault.version !== 1) {
         throw new Error(`Unsupported vault format version ${vault.version}`)
     }
@@ -89,8 +88,15 @@ async function decryptVault (vault: StoredVault, passphrase: string): Promise<Va
     const encrypted = Buffer.from(vault.contents, 'base64')
 
     const decipher = crypto.createDecipheriv(CRYPT_ALG, key, iv)
-    const plaintext = decipher.update(encrypted, undefined, 'utf-8') + decipher.final('utf-8')
-    return migrateVaultContent(JSON.parse(plaintext))
+    return decipher.update(encrypted, undefined, 'utf-8') + decipher.final('utf-8')
+}
+
+async function encryptVault (content: Vault, passphrase: string): Promise<StoredVault> {
+    return encryptWithPassphrase(JSON.stringify(content), passphrase)
+}
+
+async function decryptVault (vault: StoredVault, passphrase: string): Promise<Vault> {
+    return migrateVaultContent(JSON.parse(await decryptWithPassphrase(vault, passphrase)))
 }
 
 export const VAULT_SECRET_TYPE_FILE = 'file'

@@ -1,0 +1,44 @@
+h3.modal-header.m-0(translate) Create vault backup
+.modal-body.vault-backup-export
+    p.text-muted.mb-3(translate) Choose whether to export every connection or only the ones you select. The file is encrypted and passwords stay out of plain text.
+    .form-check.mb-2
+        input#vault-backup-all.form-check-input(
+            type='radio',
+            name='vaultBackupMode',
+            value='all',
+            [(ngModel)]='mode'
+        )
+        label.form-check-label(for='vault-backup-all', translate) All connections
+    .form-check.mb-3
+        input#vault-backup-selected.form-check-input(
+            type='radio',
+            name='vaultBackupMode',
+            value='selected',
+            [(ngModel)]='mode'
+        )
+        label.form-check-label(for='vault-backup-selected', translate) Selected connections
+
+    ng-container(*ngIf='mode === "selected"')
+        input.form-control.mb-2(
+            type='search',
+            [(ngModel)]='query',
+            [placeholder]='"Search connections"|translate'
+        )
+        .d-flex.align-items-center.mb-2.gap-2
+            button.btn.btn-sm.btn-secondary((click)='toggleVisible(true)', translate) Select visible
+            button.btn.btn-sm.btn-secondary((click)='toggleVisible(false)', translate) Clear
+            span.text-muted.ms-auto {{selectedCount}} / {{rows.length}}
+        .vault-backup-list
+            label.vault-backup-row(*ngFor='let row of visibleRows')
+                input(type='checkbox', [(ngModel)]='row.selected')
+                .vault-backup-row-body.min-width-0
+                    .vault-backup-name {{row.profile.name}}
+                    .vault-backup-meta.text-muted {{row.groupName}} · {{row.host || row.profile.type}}
+
+.modal-footer
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel
+    button.btn.btn-primary(
+        (click)='confirm()',
+        [disabled]='mode === "selected" && !selectedCount',
+        translate
+    ) Continue

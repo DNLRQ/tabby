@@ -1,0 +1,17 @@
+h3.modal-header.m-0(translate) Backup password
+.modal-body
+    p.mb-2(translate) This password is shown only once. Copy it now; it will be cleared from memory when you close this window.
+    p.text-muted(*ngIf='profileCount', translate='Connections in this backup: {count}', [translateParams]='{ count: profileCount }')
+    .vault-backup-passphrase(*ngIf='revealed && passphrase')
+        code {{passphrase}}
+    .vault-backup-passphrase.is-hidden(*ngIf='!revealed || !passphrase', translate) Password cleared from memory
+    button.btn.btn-secondary.mt-3(
+        type='button',
+        (click)='copy()',
+        [disabled]='!passphrase',
+        translate
+    ) Copy password
+    .text-muted.mt-2(*ngIf='copied', translate) Copied. Store it in a safe place before sharing the file.
+
+.modal-footer
+    button.btn.btn-primary((click)='done()', translate) I saved the password

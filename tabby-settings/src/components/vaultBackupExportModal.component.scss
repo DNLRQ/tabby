@@ -1,0 +1,48 @@
+.vault-backup-export {
+    min-width: min(560px, 80vw);
+}
+
+.vault-backup-list {
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--theme-bg-more-2);
+    border-radius: 10px;
+}
+
+.vault-backup-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--theme-bg-more-2) 80%, transparent);
+    cursor: pointer;
+
+    &:last-child {
+        border-bottom: 0;
+    }
+
+    input {
+        margin-top: 4px;
+        flex: none;
+    }
+}
+
+.vault-backup-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vault-backup-meta {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.min-width-0 {
+    min-width: 0;
+    flex: 1;
+}

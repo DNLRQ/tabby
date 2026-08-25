@@ -1,0 +1,35 @@
+.vault-backup-conflict {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.vault-backup-conflict-card {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--theme-bg-more-2);
+}
+
+.vault-backup-conflict-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 6px;
+}
+
+.vault-backup-conflict-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vault-backup-conflict-meta {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

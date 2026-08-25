@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Component, HostBinding } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
-import { BaseComponent, VaultService, VaultSecret, Vault, PlatformService, ConfigService, VAULT_SECRET_TYPE_FILE, PromptModalComponent, VaultFileSecret, TranslateService } from 'tabby-core'
+import { BaseComponent, VaultService, VaultSecret, Vault, PlatformService, ConfigService, VAULT_SECRET_TYPE_FILE, PromptModalComponent, VaultFileSecret, TranslateService, VaultBackupService, NotificationsService, VaultBackupConflictDecision } from 'tabby-core'
 import { SetVaultPassphraseModalComponent } from './setVaultPassphraseModal.component'
 import { ShowSecretModalComponent } from './showSecretModal.component'
+import { VaultBackupExportModalComponent } from './vaultBackupExportModal.component'
+import { VaultBackupPassphraseModalComponent } from './vaultBackupPassphraseModal.component'
+import { VaultBackupConflictModalComponent } from './vaultBackupConflictModal.component'
 
 
 /** @hidden */
@@ -23,6 +26,8 @@ export class VaultSettingsTabComponent extends BaseComponent {
         private platform: PlatformService,
         private ngbModal: NgbModal,
         private translate: TranslateService,
+        private vaultBackup: VaultBackupService,
+        private notifications: NotificationsService,
     ) {
         super()
         if (vault.isOpen()) {
@@ -71,6 +76,85 @@ export class VaultSettingsTabComponent extends BaseComponent {
         const newPassphrase = await modal.result.catch(() => null)
         if (newPassphrase) {
             this.vault.save(this.vaultContents, newPassphrase)
+        }
+    }
+
+    async createBackup (): Promise<void> {
+        const picker = this.ngbModal.open(VaultBackupExportModalComponent, { size: 'lg' })
+        const choice = await picker.result.catch(() => null) as { profileIds: string[] | null } | null
+        if (!choice) {
+            return
+        }
+
+        let passphrase = ''
+        try {
+            const payload = await this.vaultBackup.buildPayload(choice.profileIds)
+            passphrase = await this.vaultBackup.generatePassphrase()
+            await this.vaultBackup.exportPayload(payload, passphrase)
+            const shown = this.ngbModal.open(VaultBackupPassphraseModalComponent, {
+                backdrop: 'static',
+                keyboard: false,
+            })
+            shown.componentInstance.passphrase = passphrase
+            shown.componentInstance.profileCount = payload.profiles.length
+            await shown.result.catch(() => null)
+        } catch (e) {
+            if (String(e?.message ?? e) === 'cancelled' || String(e?.message ?? e).includes('Vault unlock cancelled')) {
+                return
+            }
+            this.notifications.error(this.translate.instant('Could not create the backup'), e?.message ?? String(e))
+        } finally {
+            passphrase = ''
+        }
+    }
+
+    async restoreBackup (): Promise<void> {
+        if (!this.vault.isEnabled()) {
+            await this.enableVault()
+            if (!this.vault.isEnabled()) {
+                return
+            }
+        }
+
+        const transfers = await this.platform.startUpload({ multiple: false })
+        if (!transfers.length) {
+            return
+        }
+
+        const prompt = this.ngbModal.open(PromptModalComponent)
+        prompt.componentInstance.password = true
+        prompt.componentInstance.prompt = this.translate.instant('Backup password')
+        const result = await prompt.result.catch(() => null)
+        let backupPassphrase = result?.value as string | undefined
+        if (!backupPassphrase) {
+            return
+        }
+
+        try {
+            const bytes = await transfers[0].readAll()
+            const imported = await this.vaultBackup.importFromFile(bytes, backupPassphrase, async conflict => {
+                const modal = this.ngbModal.open(VaultBackupConflictModalComponent, { backdrop: 'static' })
+                modal.componentInstance.incoming = conflict.incoming
+                modal.componentInstance.existing = conflict.existing
+                return await modal.result.catch(() => null) as VaultBackupConflictDecision | null
+            })
+            this.notifications.info(this.translate.instant(
+                'Restored {profiles} connections ({replaced} replaced, {skipped} skipped) and {secrets} secrets',
+                {
+                    profiles: imported.profiles,
+                    replaced: imported.replaced,
+                    skipped: imported.skipped,
+                    secrets: imported.secrets,
+                },
+            ))
+            await this.loadVault()
+        } catch (e) {
+            if (String(e?.message ?? e) === 'cancelled') {
+                return
+            }
+            this.notifications.error(this.translate.instant('Could not restore the backup'), e?.message ?? String(e))
+        } finally {
+            backupPassphrase = ''
         }
     }
 

@@ -3,6 +3,7 @@
     h3.m-3(translate) Vault is not configured
     .m-3(translate) Vault is an always-encrypted container for secrets such as SSH passwords and private key passphrases.
     button.btn.btn-primary.m-2((click)='enableVault()', translate) Set master passphrase
+    button.btn.btn-secondary.m-2((click)='restoreBackup()', translate) Restore vault backup
 
 
 div(*ngIf='vault.isEnabled()')
@@ -14,6 +15,12 @@ div(*ngIf='vault.isEnabled()')
                 a(ngbDropdownItem, (click)='changePassphrase()')
                     i.fas.fa-fw.fa-key
                     span(translate) Change the master passphrase
+                a(ngbDropdownItem, (click)='createBackup()')
+                    i.fas.fa-fw.fa-file-export
+                    span(translate) Create vault backup
+                a(ngbDropdownItem, (click)='restoreBackup()')
+                    i.fas.fa-fw.fa-file-import
+                    span(translate) Restore vault backup
                 a(ngbDropdownItem, (click)='disableVault()')
                     i.fas.fa-fw.fa-radiation-alt
                     span(translate) Erase the Vault
@@ -60,6 +67,19 @@ div(*ngIf='vault.isEnabled()')
                             i.fas.fa-fw.fa-trash
                             span(translate) Delete
 
+        h3.mt-5(translate) Backup
+        .form-line
+            .header
+                .title(translate) Encrypted backup
+                .description(translate) Export connections and passwords to an encrypted file, or restore them on another computer.
+            .d-flex.flex-wrap.gap-2
+                button.btn.btn-secondary((click)='createBackup()')
+                    i.fas.fa-file-export.me-2
+                    span(translate) Create vault backup
+                button.btn.btn-secondary((click)='restoreBackup()')
+                    i.fas.fa-file-import.me-2
+                    span(translate) Restore vault backup
+
         h3.mt-5(translate) Options
         .form-line
             .header
@@ -74,3 +94,4 @@ div(*ngIf='vault.isEnabled()')
         i.fas.fa-key.fa-3x
         h3.m-3(translate) Vault is locked
         button.btn.btn-primary.m-2((click)='loadVault()', translate) Show vault contents
+        button.btn.btn-secondary.m-2((click)='restoreBackup()', translate) Restore vault backup
