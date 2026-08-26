@@ -25,6 +25,11 @@ export class TransfersMenuComponent implements OnInit, OnDestroy {
         private translate: TranslateService,
     ) { }
 
+    get liveTransfers (): FileTransfer[] {
+        void this.progressTick
+        return this.transfers.filter(transfer => !transfer.isComplete() && !transfer.isCancelled())
+    }
+
     ngOnInit (): void {
         this.progressTimer = setInterval(() => {
             this.progressTick++

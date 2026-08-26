@@ -43,6 +43,9 @@ export class SFTPFileHandle {
         if (!this.inner) {
             throw new Error('File handle is closed')
         }
+        if (!chunk.length) {
+            return
+        }
         await this.inner.writeAll(chunk)
     }
 
@@ -313,6 +316,36 @@ export class SFTPSession {
             const handle = await this.open(tempPath, flags)
             transfer.pausable = true
             let skipped = 0
+            const writeSize = 256 * 1024
+            const pending: Uint8Array[] = []
+            let pendingBytes = 0
+            const flush = async () => {
+                if (!pendingBytes) {
+                    return
+                }
+                let payload = pending[0]
+                if (pending.length > 1) {
+                    payload = new Uint8Array(pendingBytes)
+                    let offset = 0
+                    for (const part of pending) {
+                        payload.set(part, offset)
+                        offset += part.length
+                    }
+                }
+                pending.length = 0
+                pendingBytes = 0
+                await handle.write(payload)
+            }
+            const enqueue = async (data: Uint8Array) => {
+                if (!data.length) {
+                    return
+                }
+                pending.push(data)
+                pendingBytes += data.length
+                if (pendingBytes >= writeSize) {
+                    await flush()
+                }
+            }
             while (true) {
                 await transfer.waitIfPaused()
                 if (transfer.isCancelled()) {
@@ -328,12 +361,13 @@ export class SFTPSession {
                         skipped += chunk.length
                         continue
                     }
-                    await handle.write(chunk.subarray(remain))
                     skipped = existing
+                    await enqueue(chunk.subarray(remain))
                 } else {
-                    await handle.write(chunk)
+                    await enqueue(chunk)
                 }
             }
+            await flush()
             await handle.close()
             await this.unlink(path).catch(() => null)
             await this.rename(tempPath, path)

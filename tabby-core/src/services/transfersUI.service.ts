@@ -1,16 +1,25 @@
-import { Injectable, Type } from '@angular/core'
+import { Injectable, NgZone, OnDestroy, Type } from '@angular/core'
 import { Subject } from 'rxjs'
 import { FileTransfer } from '../api/platform'
 
+function isLiveTransfer (transfer: FileTransfer): boolean {
+    return !transfer.isComplete() && !transfer.isCancelled()
+}
+
 /** @hidden */
 @Injectable({ providedIn: 'root' })
-export class TransfersUIService {
+export class TransfersUIService implements OnDestroy {
     transfers: FileTransfer[] = []
     pageComponent: Type<unknown> | null = null
     isFullScreen = false
     changed$ = new Subject<void>()
     openRequested$ = new Subject<void>()
     private opener: (() => void) | null = null
+    private sweeper: ReturnType<typeof setInterval> | null = null
+
+    constructor (
+        private zone: NgZone,
+    ) { }
 
     get hasWindow (): boolean {
         return !!this.opener || !!this.pageComponent
@@ -27,11 +36,13 @@ export class TransfersUIService {
 
     add (transfer: FileTransfer): void {
         this.transfers.push(transfer)
+        this.ensureSweeper()
         this.changed$.next()
     }
 
     set (transfers: FileTransfer[]): void {
         this.transfers = transfers
+        this.ensureSweeper()
         this.changed$.next()
     }
 
@@ -54,7 +65,49 @@ export class TransfersUIService {
         this.changed$.next()
     }
 
+    get activeTransfers (): FileTransfer[] {
+        return this.transfers.filter(isLiveTransfer)
+    }
+
     get activeCount (): number {
-        return this.transfers.filter(transfer => !transfer.isComplete() && !transfer.isCancelled()).length
+        return this.activeTransfers.length
+    }
+
+    ngOnDestroy (): void {
+        this.stopSweeper()
+    }
+
+    private ensureSweeper (): void {
+        if (!this.transfers.some(isLiveTransfer)) {
+            this.prune()
+            return
+        }
+        if (!this.sweeper) {
+            this.sweeper = setInterval(() => this.prune(), 200)
+        }
+    }
+
+    private prune (): void {
+        const live = this.transfers.filter(isLiveTransfer)
+        if (live.length === this.transfers.length) {
+            if (!live.length) {
+                this.stopSweeper()
+            }
+            return
+        }
+        this.zone.run(() => {
+            this.transfers = live
+            this.changed$.next()
+        })
+        if (!live.length) {
+            this.stopSweeper()
+        }
+    }
+
+    private stopSweeper (): void {
+        if (this.sweeper) {
+            clearInterval(this.sweeper)
+            this.sweeper = null
+        }
     }
 }

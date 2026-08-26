@@ -6,7 +6,7 @@
         i.fas.fa-expand
         span.ms-1(translate) Full screen
     button.btn.btn-link((click)='removeAll(); $event.stopPropagation()') !{require('../icons/times.svg')}
-.transfer(*ngFor='let transfer of transfers', (click)='showTransfer(transfer)')
+.transfer(*ngFor='let transfer of liveTransfers', (click)='showTransfer(transfer)')
     .icon(*ngIf='isDownload(transfer)') !{require('../icons/download.svg')}
     .icon(*ngIf='!isDownload(transfer)') !{require('../icons/upload.svg')}
     .main

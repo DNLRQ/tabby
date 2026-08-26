@@ -23,6 +23,7 @@ export class SSHConfigProvider extends ConfigProvider {
                 editorMaxSizeMB: 5,
                 transfersAutoShow: true,
                 transfersPopup: true,
+                dedicatedConnection: true,
             },
         },
         hotkeys: {

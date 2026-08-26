@@ -74,12 +74,30 @@
     font-size: 16px;
 }
 
+.sftp-brand-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .sftp-brand-title {
     font-weight: 700;
     letter-spacing: 0.08em;
     font-size: 11px;
     text-transform: uppercase;
     line-height: 1.1;
+}
+
+.sftp-brand-badge {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8fd3a4;
+    background: rgba(143, 211, 164, 0.16);
 }
 
 .sftp-brand-host {

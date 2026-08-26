@@ -3071,6 +3071,18 @@ msgstr "Preparando el archivo para arrastrar. Vuelve a soltarlo en un momento."
 msgid "Start directory"
 msgstr "Carpeta inicial"
 
+msgid "Dedicated SFTP connection"
+msgstr "Conexión SFTP dedicada"
+
+msgid "Open a second SSH session for file transfers so they do not compete with the terminal"
+msgstr "Abre una segunda sesión SSH para los archivos, para que no compitan con el terminal"
+
+msgid "Dedicated"
+msgstr "Dedicada"
+
+msgid "Could not open a dedicated SFTP connection. Using the terminal session instead."
+msgstr "No se pudo abrir una conexión SFTP dedicada. Se usará la sesión del terminal."
+
 msgid "Folder shown when SFTP opens. Use ~ for the remote home directory"
 msgstr "Carpeta que se muestra al abrir SFTP. Usa ~ para el directorio personal remoto"
 

@@ -179,6 +179,9 @@ export class AppRootComponent {
 
         transfersUI.changed$.subscribe(() => {
             this.activeTransfers = this.transfersUI.transfers
+            if (!this.activeTransfers.length) {
+                this.activeTransfersDropdown?.close()
+            }
         })
 
         platform.fileTransferStarted$.subscribe(transfer => {

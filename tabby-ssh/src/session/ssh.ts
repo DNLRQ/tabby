@@ -869,7 +869,9 @@ export class SSHSession {
         this.willDestroy.next()
         this.willDestroy.complete()
         this.serviceMessage.complete()
-        this.ssh.disconnect()
+        try {
+            this.ssh?.disconnect()
+        } catch { }
     }
 
     async openShellChannel (options: { x11: boolean }): Promise<russh.Channel> {

@@ -17,6 +17,7 @@ import { SFTPTransferLogModalComponent } from './sftpTransferLogModal.component'
 import { SFTPSendToModalComponent } from './sftpSendToModal.component'
 import { RemoteCopyTransfer, SFTPTransferDirection, SFTPTransferLogChild, SFTPTransferStatus, SFTPTransfersService } from '../services/sftpTransfers.service'
 import { SFTPConnectionRef, SFTPConnectionRegistry } from '../services/sftpConnections.service'
+import { SFTPDedicatedSessionService } from '../services/sftpDedicatedSession.service'
 
 interface PathSegment {
     name: string
@@ -35,6 +36,7 @@ interface SFTPUserConfig {
     editorMaxSizeMB: number
     transfersAutoShow: boolean
     transfersPopup: boolean
+    dedicatedConnection: boolean
 }
 
 @Component({
@@ -51,6 +53,7 @@ export class SFTPPanelComponent implements OnDestroy {
     @Output() pathChange = new EventEmitter<string>()
     @Output() newWindow = new EventEmitter<void>()
     sftp: SFTPSession
+    usingDedicatedConnection = false
     fileList: SFTPFile[]|null = null
     filteredFileList: SFTPFile[] = []
     pathSegments: PathSegment[] = []
@@ -88,6 +91,7 @@ export class SFTPPanelComponent implements OnDestroy {
         sourceHost?: string
         destHost?: string
     } | null = null
+    private dedicatedSession: SSHSession | null = null
 
     constructor (
         private ngbModal: NgbModal,
@@ -98,6 +102,7 @@ export class SFTPPanelComponent implements OnDestroy {
         private hostApp: HostAppService,
         private transferLog: SFTPTransfersService,
         private connections: SFTPConnectionRegistry,
+        private dedicatedSessions: SFTPDedicatedSessionService,
         private element: ElementRef<HTMLElement>,
         @Optional() @Inject(SFTPContextMenuItemProvider) protected contextMenuProviders: SFTPContextMenuItemProvider[],
     ) {
@@ -138,10 +143,30 @@ export class SFTPPanelComponent implements OnDestroy {
         this.updateFilteredList()
     }
 
+    private async openSftpSession (): Promise<SSHSession> {
+        if (this.sftpConfig.dedicatedConnection === false) {
+            return this.session
+        }
+        try {
+            this.dedicatedSession = await this.dedicatedSessions.open(this.session)
+            this.usingDedicatedConnection = true
+            return this.dedicatedSession
+        } catch (error) {
+            this.dedicatedSession = null
+            this.usingDedicatedConnection = false
+            const reason = error instanceof Error ? error.message : String(error)
+            console.warn('Dedicated SFTP session failed', error)
+            this.session.emitServiceMessage(`Dedicated SFTP failed: ${reason}`)
+            this.notifications.notice(this.translate.instant('Could not open a dedicated SFTP connection. Using the terminal session instead.') + (reason ? ` (${reason})` : ''))
+            return this.session
+        }
+    }
+
     async ngOnInit (): Promise<void> {
         document.addEventListener('keydown', this.onKeydownCapture, true)
         this.configSub = this.config.changed$.subscribe(() => this.applySftpSettings())
-        this.sftp = await this.session.openSFTP()
+        const sftpSession = await this.openSftpSession()
+        this.sftp = await sftpSession.openSFTP()
         this.connections.register(this)
         let start = this.path
         if (!start || start === '/') {

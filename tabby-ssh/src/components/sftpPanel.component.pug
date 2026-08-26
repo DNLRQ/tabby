@@ -6,7 +6,12 @@
                 .sftp-brand-icon
                     i.fas.fa-folder-open
                 .sftp-brand-text
-                    .sftp-brand-title SFTP
+                    .sftp-brand-title-row
+                        .sftp-brand-title SFTP
+                        .sftp-brand-badge(
+                            *ngIf='usingDedicatedConnection',
+                            [ngbTooltip]='"Dedicated SFTP connection"|translate'
+                        ) {{ "Dedicated"|translate }}
                     .sftp-brand-host(*ngIf='hostLabel') {{hostLabel}}
 
             .sftp-search

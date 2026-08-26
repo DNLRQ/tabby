@@ -83,6 +83,7 @@ export abstract class FileTransfer {
     cancel (): void {
         this.cancelled = true
         this.paused = false
+        this.markFinished()
         const waiters = this.pauseWaiters.splice(0)
         for (const waiter of waiters) {
             waiter()
@@ -100,6 +101,9 @@ export abstract class FileTransfer {
 
     setCompleted (completed: boolean): void {
         this.completed = completed
+        if (completed) {
+            this.markFinished()
+        }
     }
 
     reportProgress (bytes: number): void {
@@ -119,11 +123,28 @@ export abstract class FileTransfer {
     }
 
     getElapsed (): number {
-        return Date.now() - this.startedAt
+        return this.getEndTime() - this.startedAt
     }
 
     getHost (): string {
         return this.host
+    }
+
+    protected markFinished (): void {
+        if (this.finishedAt == null) {
+            this.finishedAt = Date.now()
+        }
+    }
+
+    private getEndTime (): number {
+        if (this.finishedAt != null) {
+            return this.finishedAt
+        }
+        if (this.isComplete() || this.isCancelled()) {
+            this.markFinished()
+            return this.finishedAt ?? Date.now()
+        }
+        return Date.now()
     }
 
     protected increaseProgress (bytes: number): void {
@@ -142,6 +163,7 @@ export abstract class FileTransfer {
     private cancelled = false
     private completed = false
     private paused = false
+    private finishedAt: number | null = null
     private pauseWaiters: Array<() => void> = []
     private status = ''
 }

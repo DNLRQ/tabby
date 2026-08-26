@@ -58,7 +58,7 @@ export class SFTPTransfersWindowComponent extends BaseComponent implements OnIni
 
     get activeTransfers (): FileTransfer[] {
         void this.progressTick
-        return this.transfersUI.transfers
+        return this.transfersUI.activeTransfers
     }
 
     get entries (): SFTPTransferLogEntry[] {

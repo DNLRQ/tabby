@@ -59,6 +59,15 @@ h3(translate) Transfers
 
 .form-line
     .header
+        .title(translate) Dedicated SFTP connection
+        .description(translate) Open a second SSH session for file transfers so they do not compete with the terminal
+    toggle(
+        [(ngModel)]='config.store.ssh.sftp.dedicatedConnection',
+        (ngModelChange)='config.save()',
+    )
+
+.form-line
+    .header
         .title(translate) Start directory
         .description(translate) Folder shown when SFTP opens. Use ~ for the remote home directory
     input.form-control(
